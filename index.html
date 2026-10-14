@@ -34,6 +34,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
 <script src="/peerjs.min.js"></script>
+<script src="/qrcode.min.js"></script>
 <style>
 /* Layout: sala de controle de transmissão — lista de pessoas | palco de telas | chat. Tema escuro único, como uma régie. */
 :root{
@@ -168,6 +169,39 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 .mreacts button{background:transparent;border:0;font-size:24px;padding:6px 8px;border-radius:10px;line-height:1}
 .mreacts button:active{background:var(--raise);transform:scale(1.15)}
 .tabbar{display:none}
+.startbtns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.sources{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;min-width:0}
+.ksym{color:var(--accent);display:grid}
+.livebox .meta span.spec{white-space:nowrap}
+.stagebar{display:flex;align-items:center;gap:6px;padding:10px 14px 0;justify-content:flex-end}
+.stagebar .count{margin-right:auto;font-size:13px;color:var(--muted)}
+.stagebar .btn{padding:6px 10px;font-size:13px}
+.stagebar .btn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);background:rgba(79,209,197,.1)}
+.watchall{margin:2px 6px 6px}
+.srow{display:flex;align-items:center;gap:8px;padding:2px 0 2px 42px;min-width:0}
+.srow .ksym svg{width:15px;height:15px}
+.srow .st{min-width:0;flex:1;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.srow .st b{color:var(--text);font-weight:600}
+.mact{display:flex;flex-wrap:wrap;gap:6px;padding-left:42px}
+.mact .btn{padding:4px 9px;font-size:12px;min-height:0}
+.mact .btn.warn{color:#ff8f8f;border-color:rgba(255,143,143,.4)}
+.req{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 8px;margin-left:42px;max-width:calc(100% - 42px);border:1px solid var(--accent);background:rgba(79,209,197,.08);border-radius:8px;font-size:12px}
+.req span{flex:1 1 100%;min-width:0;overflow-wrap:anywhere}
+.req .btn{padding:4px 10px;font-size:12px;min-height:0}
+.lockic svg{width:13px;height:13px;vertical-align:-2px;margin-right:3px}
+.banbox{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.banbox h4{margin:0 0 6px;font:600 11px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.banrow{display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 0}
+.banrow span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.banrow .btn{padding:3px 9px;font-size:12px;min-height:0}
+.qrmodal{align-items:center;text-align:center}
+.qrbox{background:#fff;border-radius:12px;padding:14px;width:min(280px,100%);aspect-ratio:1}
+.qrbox svg{display:block;width:100%;height:100%}
+.qrlink{font-size:12px;color:var(--muted);word-break:break-all}
+.srow .btn{padding:4px 9px;font-size:12px;min-height:0}
+.tile-top .kic{display:grid;color:#fff}
+.tile-top .kic svg{width:15px;height:15px}
+.tile.mirror video{transform:scaleX(-1)}
 
 /* barra de controle */
 .dock{grid-column:2;display:flex;align-items:center;justify-content:center;gap:10px;padding:12px 14px;border-top:1px solid var(--line);flex-wrap:wrap}
@@ -202,6 +236,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 .modal p.sub{margin:-10px 0 0;color:var(--muted);font-size:14px}
 .seg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .seg.three{grid-template-columns:repeat(3,1fr)}
+.stage.odd > .tile:last-child{grid-column:1/-1}
 .seg.two{grid-template-columns:repeat(2,1fr)}
 .seg input{position:absolute;opacity:0;pointer-events:none}
 .seg label{border:1px solid var(--line);background:var(--ink);border-radius:8px;padding:9px 6px;text-align:center;cursor:pointer;display:flex;flex-direction:column;gap:1px;font-weight:600;font-size:14px;text-transform:none;letter-spacing:0;color:var(--text)}
@@ -245,6 +280,10 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
   .stage.focus .strip{height:92px;flex:none}
   .strip .tile{width:150px;aspect-ratio:16/9}
   .stage .empty{margin:auto}
+  .stage .tile.portrait{aspect-ratio:3/4;width:min(100%,380px);align-self:center}
+  .stagebar{padding:8px 12px 0}
+  .sources{width:100%}
+  .livebox .meta b{max-width:140px}
   .lobby-wrap{grid-template-columns:1fr;gap:28px}
   .toasts{left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));top:calc(58px + env(safe-area-inset-top,0px));max-width:none}
 }
@@ -257,8 +296,10 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
   .dock{display:none}
   .tab{flex-direction:row;min-height:42px;gap:8px}
   .stage{flex-direction:row;overflow-x:auto;overflow-y:hidden;padding:6px;gap:6px}
-  .stage .tile{aspect-ratio:auto;width:auto;height:100%;flex:1 0 min(100%,720px)}
-  .stage.single .tile{flex:1 1 100%}
+  .stage .tile{aspect-ratio:auto;width:auto;height:100%;flex:1 1 0;min-width:0}
+  .stage.many .tile{flex:1 0 46%}
+  .stage .tile.portrait{aspect-ratio:auto;width:auto;align-self:stretch}
+  .stagebar{display:none}
 }
 @media (pointer:coarse){
   .btn{min-height:44px}
@@ -290,6 +331,13 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
   <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0M16 4.5a3.5 3.5 0 010 7M18 14a6 6 0 013.5 6"/></symbol>
   <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
   <symbol id="i-out" viewBox="0 0 24 24"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24"><path d="M3 7h10a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/><path d="M15 11l6-3.5v9L15 13"/></symbol>
+  <symbol id="i-qr" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h3v3h-3zM20 14v3M14 20h3M20 20h0M17 17v3"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></symbol>
+  <symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M6.3 6.3l11.4 11.4"/></symbol>
+  <symbol id="i-flip" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0113.7-5.6L20 8M20 4v4h-4M20 12a8 8 0 01-13.7 5.6L4 16M4 20v-4h4"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></symbol>
+  <symbol id="i-spot" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="12" rx="2"/><rect x="3" y="18" width="5" height="3" rx="1"/><rect x="10" y="18" width="5" height="3" rx="1"/><rect x="17" y="18" width="4" height="3" rx="1"/></symbol>
   <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12l16-8-6 16-2-7z"/></symbol>
 </svg>
 
@@ -327,6 +375,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
     <div class="brand"><span class="tally"></span><span>CodeView</span></div>
     <div class="roomcode"><span class="label lbl">Sala</span><b id="codeOut">------</b>
       <button class="btn ghost icon" id="copyInvite" title="Convidar" aria-label="Copiar ou compartilhar o link de convite"><svg class="i"><use href="#i-copy"/></svg></button>
+      <button class="btn ghost icon" id="qrBtn" title="QR code da sala" aria-label="Mostrar QR code da sala"><svg class="i"><use href="#i-qr"/></svg></button>
     </div>
     <div class="spacer"></div>
     <div class="netdot" id="netdot"><span id="netTxt">Conectado</span></div>
@@ -335,10 +384,18 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 
   <aside class="side" id="side">
     <h3><span>Na sala</span><span id="countOut">0</span></h3>
+    <button class="btn primary watchall" id="watchAll" hidden><svg class="i"><use href="#i-grid"/></svg><span id="watchAllTxt">Assistir todas</span></button>
     <div id="memberList"></div>
+    <div class="banbox" id="banBox" hidden><h4>Banidos</h4><div id="banList"></div></div>
   </aside>
 
   <section class="stage-wrap">
+    <div class="stagebar" id="stagebar" hidden>
+      <span class="count" id="tileCount"></span>
+      <button class="btn" id="sbGrid" aria-pressed="true" title="Todas as telas lado a lado"><svg class="i"><use href="#i-grid"/></svg>Grade</button>
+      <button class="btn" id="sbSpot" aria-pressed="false" title="Uma tela grande e as outras pequenas"><svg class="i"><use href="#i-spot"/></svg>Destaque</button>
+      <button class="btn ghost" id="sbClose" title="Parar de assistir todas"><svg class="i"><use href="#i-x"/></svg>Fechar todas</button>
+    </div>
     <div class="stage" id="stage"></div>
   </section>
 
@@ -356,17 +413,14 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
   </aside>
 
   <footer class="dock" id="dock">
-    <button class="btn primary" id="goLiveBtn"><svg class="i"><use href="#i-screen"/></svg>Transmitir tela</button>
+    <div class="startbtns">
+      <button class="btn primary" id="goLiveBtn"><svg class="i"><use href="#i-screen"/></svg><span>Transmitir tela</span></button>
+      <button class="btn" id="goCamBtn"><svg class="i"><use href="#i-cam"/></svg><span>Câmera</span></button>
+    </div>
     <div class="mreacts" id="mreacts">
       <button data-e="🔥" aria-label="Fogo">🔥</button><button data-e="😂" aria-label="Risada">😂</button><button data-e="👏" aria-label="Palmas">👏</button><button data-e="😱" aria-label="Choque">😱</button><button data-e="❤️" aria-label="Coração">❤️</button>
     </div>
-    <div class="livebox" id="liveBox" hidden>
-      <span class="rec"></span>
-      <div class="meta"><b id="liveLabel">Ao vivo</b><span id="liveSpec">1080p · 30fps</span></div>
-      <button class="btn ghost icon" id="swapBtn" title="Trocar janela/tela" aria-label="Trocar o que está sendo transmitido"><svg class="i"><use href="#i-swap"/></svg></button>
-      <button class="btn ghost icon" id="settingsBtn" title="Qualidade da transmissão" aria-label="Qualidade da transmissão"><svg class="i"><use href="#i-sliders"/></svg></button>
-      <button class="btn danger" id="stopBtn"><svg class="i"><use href="#i-stop"/></svg>Encerrar</button>
-    </div>
+    <div class="sources" id="sources"></div>
   </footer>
 
   <nav class="tabbar" id="tabbar" role="tablist" aria-label="Seções da sala">
@@ -388,8 +442,15 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
       </div>
     </div>
     <p class="help" id="modeHelp"></p>
+    <div class="field" id="facingRow" hidden><span class="label">Qual câmera</span>
+      <div class="seg two">
+        <input type="radio" name="facing" id="fU" value="user" checked><label for="fU">Frontal<small>selfie</small></label>
+        <input type="radio" name="facing" id="fE" value="environment"><label for="fE">Traseira<small>principal</small></label>
+      </div>
+    </div>
     <div class="field"><span class="label">Resolução</span>
-      <div class="seg">
+      <div class="seg" id="resSeg">
+        <input type="radio" name="res" id="r480" value="480" hidden><label for="r480" hidden>480p<small>leve</small></label>
         <input type="radio" name="res" id="r720" value="720"><label for="r720">720p<small>HD</small></label>
         <input type="radio" name="res" id="r1080" value="1080" checked><label for="r1080">1080p<small>Full HD</small></label>
         <input type="radio" name="res" id="r1440" value="1440"><label for="r1440">1440p<small>2K</small></label>
@@ -403,10 +464,16 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
         <input type="radio" name="fps" id="f60" value="60"><label for="f60">60<small>fluido</small></label>
       </div>
     </div>
-    <div class="field"><span class="label">Otimizar para</span>
+    <div class="field" id="hintRow"><span class="label">Otimizar para</span>
       <div class="seg two">
         <input type="radio" name="hint" id="hm" value="motion" checked><label for="hm">Movimento<small>jogos e vídeos</small></label>
         <input type="radio" name="hint" id="hd" value="detail"><label for="hd">Nitidez<small>texto e código</small></label>
+      </div>
+    </div>
+    <div class="field" id="accessRow"><span class="label">Quem pode assistir</span>
+      <div class="seg two">
+        <input type="radio" name="access" id="aOpen" value="open" checked><label for="aOpen">Todos da sala<small>entra direto</small></label>
+        <input type="radio" name="access" id="aAsk" value="ask"><label for="aAsk">Só quem eu aceitar<small>privado</small></label>
       </div>
     </div>
     <div class="field"><label for="uploadIn">Seu upload de internet</label>
@@ -414,12 +481,25 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
         <option value="auto">Automático</option><option value="5">até 5 Mbps</option><option value="10">até 10 Mbps</option><option value="20">até 20 Mbps</option><option value="50">50 Mbps ou mais</option>
       </select>
     </div>
-    <label class="check" id="audioRow"><input type="checkbox" id="audioIn" checked><span>Incluir áudio<small>No Chrome/Edge marque "Compartilhar áudio" na janela de escolha. Áudio de janela única só funciona em abas.</small></span></label>
+    <label class="check" id="audioRow"><input type="checkbox" id="audioIn" checked><span><span id="audioText">Incluir áudio</span><small id="audioHelp">No Chrome/Edge marque "Compartilhar áudio" na janela de escolha. Áudio de janela única só funciona em abas.</small></span></label>
     <div class="actions">
       <button class="btn ghost" type="button" id="cancelModal">Cancelar</button>
       <button class="btn primary" type="submit" id="confirmLive"><svg class="i"><use href="#i-screen"/></svg>Escolher tela</button>
     </div>
   </form>
+</div>
+
+<div class="scrim" id="qrModal" hidden>
+  <div class="modal qrmodal" role="dialog" aria-labelledby="qrTitle">
+    <h2 id="qrTitle">Entrar pelo celular</h2>
+    <p class="sub">Aponte a câmera do celular para o QR code e a sala abre já com o código preenchido.</p>
+    <div class="qrbox" id="qrBox" aria-label="QR code do convite"></div>
+    <div class="qrlink mono" id="qrLink"></div>
+    <div class="actions">
+      <button class="btn" type="button" id="qrCopy"><svg class="i"><use href="#i-copy"/></svg>Copiar link</button>
+      <button class="btn primary" type="button" id="qrClose">Fechar</button>
+    </div>
+  </div>
 </div>
 
 <div class="toasts" id="toasts"></div>
@@ -431,34 +511,57 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 const PREFIX = "codeview-";
 const $ = s => document.querySelector(s);
 const QUALITY = {
-  "720":  {w:1280, h:720,  br:2500, label:"720p"},
-  "1080": {w:1920, h:1080, br:5000, label:"1080p"},
-  "1440": {w:2560, h:1440, br:8000, label:"1440p"},
+  "480":  {w:854,  h:480,  br:1200,  label:"480p"},
+  "720":  {w:1280, h:720,  br:2500,  label:"720p"},
+  "1080": {w:1920, h:1080, br:5000,  label:"1080p"},
+  "1440": {w:2560, h:1440, br:8000,  label:"1440p"},
   "src":  {w:3840, h:2160, br:12000, label:"Fonte"}
 };
 const COLORS = ["#4fd1c5","#f5b84b","#ff8fa3","#9fa8ff","#7bd88f","#ffb37a","#c49bff","#6ec3ff"];
+const MAX_SOURCES = 3;   // fontes ao vivo por pessoa (telas e câmera)
+const MAX_TILES = 6;     // telas assistidas ao mesmo tempo
 const canShare = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+const canCamera = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 
+const DEFAULT_PREFS = {
+  screen:{res:"1080", fps:30, hint:"motion", audio:true, mode:"stable", access:"open"},
+  camera:{res:"720",  fps:30, hint:"motion", audio:true, mode:"stable", facing:"user", access:"open"},
+  upload:"auto"
+};
 const S = {
   peer:null, isHost:false, code:"", myId:"", myName:"",
-  hubConn:null,            // cliente -> anfitrião
-  conns:new Map(),         // anfitrião -> clientes
-  members:{},
-  local:null,              // MediaStream da minha transmissão
-  settings:{res:"1080", fps:30, hint:"motion", audio:true, mode:"stable", upload:"auto"},
-  tab:"stage", unread:0,
-  outCalls:new Map(),      // viewerId -> MediaConnection
-  watching:new Map(),      // streamerId -> {call, stream, tile, last}
-  focus:null, ended:false, modalMode:"start"
+  hubConn:null,             // cliente -> anfitrião
+  conns:new Map(),          // anfitrião -> clientes
+  members:{},               // id -> {id,name,host,streams:[],watching:[]}
+  prefs:JSON.parse(JSON.stringify(DEFAULT_PREFS)),
+  out:new Map(),            // sid -> {sid,kind,stream,set,label}  (minhas fontes ao vivo)
+  outCalls:new Map(),       // "viewerId:sid" -> MediaConnection
+  wants:new Map(),          // "viewerId:sid" -> "low" | "auto" (qualidade pedida pelo espectador)
+  watching:new Map(),       // "ownerId:sid" -> {call,stream,tile,...}
+  selfTiles:new Map(),      // sid -> tile da minha prévia
+  banned:new Map(),         // anfitrião: cvid -> {name}
+  cv:new Map(),             // anfitrião: peerId -> cvid
+  acl:{allowed:new Set(), blocked:new Set(), pending:new Map()}, // privacidade das minhas fontes
+  focus:null, ended:false, modal:null, tab:"stage", unread:0
 };
 
 /* ---------------- ambiente, URLs e preferências ---------------- */
-try{ Object.assign(S.settings, JSON.parse(localStorage.getItem("codeview-settings")||"{}")); }catch(e){}
-if(!QUALITY[S.settings.res]) S.settings.res = "1080";
-if(![15,30,60].includes(S.settings.fps)) S.settings.fps = 30;
-if(!["stable","max"].includes(S.settings.mode)) S.settings.mode = "stable";
-if(!["auto","5","10","20","50"].includes(String(S.settings.upload))) S.settings.upload = "auto";
-const saveSettings = () => { try{ localStorage.setItem("codeview-settings", JSON.stringify(S.settings)); }catch(e){} };
+try{
+  const p = JSON.parse(localStorage.getItem("codeview-prefs") || "{}");
+  for(const k of ["screen","camera"]) Object.assign(S.prefs[k], p[k] || {});
+  if(p.upload) S.prefs.upload = p.upload;
+}catch(e){}
+for(const k of ["screen","camera"]){
+  const o = S.prefs[k];
+  if(!QUALITY[o.res]) o.res = DEFAULT_PREFS[k].res;
+  if(![15,30,60].includes(Number(o.fps))) o.fps = 30; else o.fps = Number(o.fps);
+  if(!["stable","max"].includes(o.mode)) o.mode = "stable";
+  if(!["motion","detail"].includes(o.hint)) o.hint = "motion";
+  if(!["user","environment"].includes(o.facing || "user")) o.facing = "user";
+  if(!["open","ask"].includes(o.access)) o.access = "open";
+}
+if(!["auto","5","10","20","50"].includes(String(S.prefs.upload))) S.prefs.upload = "auto";
+const savePrefs = () => { try{ localStorage.setItem("codeview-prefs", JSON.stringify(S.prefs)); }catch(e){} };
 const IS_TOUCH = matchMedia("(pointer:coarse)").matches;
 const MOBILE = () => matchMedia("(max-width:980px)").matches;
 // Em produção usamos /sala/CODIGO (o netlify.toml reescreve para o index.html). Local ou file:// usa #CODIGO.
@@ -482,7 +585,7 @@ let wakeLock = null;
 async function keepAwake(){
   try{ if(!("wakeLock" in navigator) || wakeLock) return; wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => { wakeLock = null; }); }catch(e){}
 }
-document.addEventListener("visibilitychange", () => { if(!document.hidden && (S.watching.size || S.local)) keepAwake(); });
+document.addEventListener("visibilitychange", () => { if(!document.hidden && (S.watching.size || S.out.size)) keepAwake(); });
 document.addEventListener("fullscreenchange", () => {
   if(!IS_TOUCH) return;
   try{ if(document.fullscreenElement) screen.orientation?.lock?.("landscape").catch(()=>{}); else screen.orientation?.unlock?.(); }catch(e){}
@@ -498,6 +601,13 @@ const hubId = code => PREFIX + code + "-hub";
 const icon = n => `<svg class="i"><use href="#i-${n}"/></svg>`;
 const el = (tag, cls, html) => { const e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; };
 function store(k,v){ try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k,v);}catch(e){ return null; } }
+const CVID = (() => { let v = store0("codeview-cvid"); if(!v){ v = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2); try{ localStorage.setItem("codeview-cvid", v); }catch(e){} } return v.slice(0,40); })();
+function store0(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+const newSid = () => Math.random().toString(36).slice(2,6).padEnd(4,"0");
+const keyOf = (owner, sid) => owner + ":" + sid;
+function parseKey(k){ k = String(k||""); const i = k.lastIndexOf(":"); return i < 0 ? {owner:k, sid:""} : {owner:k.slice(0,i), sid:k.slice(i+1)}; }
+const streamsOf = m => (m && m.streams) || [];
+const findStream = (m, sid) => streamsOf(m).find(x => x.sid === sid);
 
 function toast(text, action, ms=4500){
   const t = el("div","toast"); const sp = el("span"); sp.textContent=text; t.append(sp);
@@ -544,7 +654,7 @@ function createRoom(name, code, tries=0){
   const p = basePeer(hubId(code));
   p.on("open", id => {
     S.peer=p; S.isHost=true; S.code=code; S.myId=id; S.myName=name;
-    S.members[id] = {id, name, host:true, streaming:false, info:null, watching:[]};
+    S.members[id] = {id, name, host:true, streams:[], watching:[]};
     p.on("connection", hubAccept);
     enterRoom();
     sysMsg(`Você criou a sala. Mande o código ${code} para os amigos.`);
@@ -560,10 +670,11 @@ function joinRoom(name, code){
   let joined = false;
   p.on("open", id => {
     S.peer=p; S.code=code; S.myId=id; S.myName=name;
-    const c = p.connect(hubId(code), {reliable:true, serialization:"json", metadata:{name}});
+    const c = p.connect(hubId(code), {reliable:true, serialization:"json", metadata:{name, cvid:CVID}});
     S.hubConn = c;
-    c.on("open", () => { joined=true; c.send({t:"hello", name}); enterRoom(); });
-    c.on("data", clientHandle);
+    let entered = false;
+    c.on("open", () => { joined=true; c.send({t:"hello", name}); });
+    c.on("data", msg => { if(msg && msg.t === "state" && !entered){ entered = true; enterRoom(); } clientHandle(msg); });
     c.on("close", () => { if(joined) endRoom("A sala foi encerrada","O anfitrião saiu ou a conexão caiu."); });
   });
   p.on("error", err => {
@@ -590,27 +701,44 @@ function enterRoom(){
   $("#lobby").hidden = true; $("#room").hidden = false;
   $("#codeOut").textContent = S.code;
   setRoomUrl(S.code); document.title = "Sala " + S.code + " · CodeView";
-  if(!canShare){
-    $("#goLiveBtn").hidden = true;
-    if(!store("codeview-mobile-tip")){ store("codeview-mobile-tip", "1"); setTimeout(() => toast("Aqui você assiste e conversa. Para transmitir a tela, entre pelo computador.", null, 7000), 800); }
-  }
   $("#leaveBtn").title = S.isHost ? "Sair (a sala fecha para todos)" : "Sair da sala";
+  if(!canShare && canCamera && !store("codeview-mobile-tip")){
+    store("codeview-mobile-tip", "1");
+    setTimeout(() => toast("Pelo celular você pode transmitir a câmera. Para compartilhar a tela, use o computador.", null, 8000), 800);
+  }
+  renderDock();
   render();
 }
 
 /* ---------------- anfitrião: hub ---------------- */
 function hubAccept(conn){
-  conn.on("open", () => S.conns.set(conn.peer, conn));
+  const cv = String((conn.metadata && conn.metadata.cvid) || "").slice(0, 40);
+  if(cv && S.banned.has(cv)){
+    conn.on("open", () => { try{ conn.send({t:"kicked", ban:true}); }catch(e){} setTimeout(() => { try{ conn.close(); }catch(e){} }, 400); });
+    return;
+  }
+  conn.on("open", () => { S.conns.set(conn.peer, conn); S.cv.set(conn.peer, cv); });
   conn.on("data", msg => hubHandle(conn.peer, msg));
   conn.on("close", () => hubDrop(conn.peer));
   conn.on("error", () => hubDrop(conn.peer));
 }
-function hubDrop(id){
+function hubDrop(id, text){
   if(!S.members[id]) return;
   const name = S.members[id].name;
   S.conns.delete(id); delete S.members[id];
-  broadcast({t:"sys", text:`${name} saiu da sala.`});
+  broadcast({t:"sys", text: text || `${name} saiu da sala.`});
   broadcastState();
+}
+// só o anfitrião (o próprio hub) pode moderar
+function hubKick(id, ban){
+  if(id === S.myId) return;
+  const m = S.members[id], c = S.conns.get(id);
+  if(!m) return;
+  if(ban){ const cv = S.cv.get(id); S.banned.set(cv || id, {name:m.name}); }
+  if(c){ try{ c.send({t:"kicked", ban:!!ban}); }catch(e){} setTimeout(() => { try{ c.close(); }catch(e){} }, 400); }
+  S.cv.delete(id);
+  hubDrop(id, ban ? `${m.name} foi banido da sala.` : `${m.name} foi removido da sala.`);
+  renderBans();
 }
 function broadcast(msg){
   for(const c of S.conns.values()){ try{ c.send(msg); }catch(e){} }
@@ -621,30 +749,50 @@ function deliver(id, msg){
   if(id === S.myId) clientHandle(msg);
   else { const c=S.conns.get(id); if(c) try{ c.send(msg); }catch(e){} }
 }
+function cleanStream(s){
+  if(!s || typeof s !== "object") return null;
+  const str = (v, n) => String(v == null ? "" : v).slice(0, n);
+  const sid = str(s.sid, 8).replace(/[^a-z0-9]/gi, "");
+  if(!sid) return null;
+  return {
+    sid, kind: s.kind === "camera" ? "camera" : "screen", label: str(s.label, 60),
+    res: QUALITY[s.res] ? s.res : "1080", fps: [15,30,60].includes(Number(s.fps)) ? Number(s.fps) : 30,
+    hint: s.hint === "detail" ? "detail" : "motion", mode: s.mode === "max" ? "max" : "stable",
+    audio: !!s.audio, facing: s.facing === "environment" ? "environment" : "user", access: s.access === "ask" ? "ask" : "open"
+  };
+}
 function hubHandle(from, msg){
   if(!msg || typeof msg !== "object") return;
   const m = S.members[from];
-  if(msg.to){ deliver(msg.to, {...msg, from}); return; }
+  if(msg.to){ if(["watch","unwatch","want","deny","pending"].includes(msg.t)) deliver(msg.to, {...msg, from}); return; }
   switch(msg.t){
     case "hello": {
       const name = String(msg.name||"Visitante").slice(0,24);
-      S.members[from] = {id:from, name, host:false, streaming:false, info:null, watching:[]};
+      S.members[from] = {id:from, name, host:false, streams:[], watching:[]};
       broadcast({t:"sys", text:`${name} entrou na sala.`});
       broadcastState(); break;
     }
     case "update": {
       if(!m) return;
-      const wasLive = m.streaming;
-      const p = msg.patch||{};
-      if("streaming" in p) m.streaming = !!p.streaming;
-      if("info" in p) m.info = p.info;
-      if(Array.isArray(p.watching)) m.watching = p.watching.slice(0,12);
+      const p = msg.patch || {};
+      let fresh = [];
+      if(Array.isArray(p.streams)){
+        const next = p.streams.slice(0, MAX_SOURCES).map(cleanStream).filter(Boolean);
+        const had = new Set(streamsOf(m).map(x => x.sid));
+        fresh = next.filter(x => !had.has(x.sid));
+        m.streams = next;
+      }
+      if(Array.isArray(p.watching)) m.watching = p.watching.slice(0,16).map(x => String(x).slice(0,80));
       broadcastState();
-      if(!wasLive && m.streaming) broadcast({t:"live", id:from, name:m.name});
+      fresh.forEach(x => broadcast({t:"live", id:from, name:m.name, sid:x.sid, kind:x.kind}));
       break;
     }
+    case "kick": if(from === S.myId) hubKick(String(msg.id||""), false); break;
+    case "ban": if(from === S.myId) hubKick(String(msg.id||""), true); break;
+    case "unban": if(from === S.myId){ S.banned.delete(String(msg.cv||"")); renderBans(); } break;
+    case "stopstream": if(from === S.myId && msg.id !== S.myId) deliver(String(msg.id||""), {t:"forcestop", sid:String(msg.sid||"")}); break;
     case "chat": if(m) broadcast({t:"chat", id:from, name:m.name, text:String(msg.text||"").slice(0,400), ts:Date.now()}); break;
-    case "react": if(m) broadcast({t:"react", id:from, name:m.name, target:msg.target, emoji:String(msg.emoji||"").slice(0,4)}); break;
+    case "react": if(m) broadcast({t:"react", id:from, name:m.name, target:String(msg.target||"").slice(0,80), emoji:String(msg.emoji||"").slice(0,4)}); break;
   }
 }
 function send(msg){
@@ -654,6 +802,7 @@ function send(msg){
 const updateMe = patch => send({t:"update", patch});
 
 /* ---------------- cliente: mensagens ---------------- */
+const liveBatch = {};
 function clientHandle(msg){
   switch(msg.t){
     case "state": S.members = msg.members || {}; reconcile(); render(); break;
@@ -662,27 +811,55 @@ function clientHandle(msg){
     case "react": showReaction(msg); break;
     case "live":
       if(msg.id !== S.myId){
-        toast(`${msg.name} começou a transmitir`, {label:"Assistir", fn:()=>watch(msg.id)}, 7000);
-        sysMsg(`${msg.name} está ao vivo.`);
+        sysMsg(msg.kind === "camera" ? `${msg.name} está com a câmera ao vivo.` : `${msg.name} está ao vivo.`);
+        // junta avisos seguidos da mesma pessoa em um só
+        const b = liveBatch[msg.id] || (liveBatch[msg.id] = {name:msg.name, items:[]});
+        b.items.push({sid:msg.sid, kind:msg.kind});
+        clearTimeout(b.t);
+        b.t = setTimeout(() => {
+          delete liveBatch[msg.id];
+          const its = b.items.filter(x => S.members[msg.id] && findStream(S.members[msg.id], x.sid));
+          if(!its.length) return;
+          if(its.length === 1) toast(its[0].kind === "camera" ? `${b.name} abriu a câmera` : `${b.name} começou a transmitir`, {label:"Assistir", fn:()=>watch(keyOf(msg.id, its[0].sid))}, 7000);
+          else toast(`${b.name} está com ${its.length} transmissões ao vivo`, {label:"Assistir todas", fn:()=>its.forEach(x => watch(keyOf(msg.id, x.sid)))}, 8000);
+        }, 700);
       }
       break;
-    case "watch": if(S.local) callViewer(msg.from); break;
-    case "unwatch": closeOut(msg.from); break;
+    case "kicked": endRoom(msg.ban ? "Você foi banido" : "Você foi removido", msg.ban ? "O anfitrião baniu você desta sala." : "O anfitrião removeu você da sala."); break;
+    case "forcestop":
+      if(S.out.has(msg.sid)){ stopSource(msg.sid); toast("O anfitrião encerrou uma das suas transmissões.", null, 7000); }
+      break;
+    case "watch": onWatchRequest(msg.from, msg.sid); break;
+    case "unwatch": { const k = keyOf(msg.from, msg.sid); closeOut(k); S.wants.delete(k); if(S.acl.pending.delete(k)) render(); break; }
+    case "pending": { const k = keyOf(msg.from, msg.sid); if(S.watching.has(k)) setStatus(k, `Aguardando ${S.members[msg.from]?.name || "a pessoa"} aceitar…`, true); break; }
+    case "deny": onDenied(msg.from, msg.sid, msg.reason); break;
+    case "want": {
+      const k = keyOf(msg.from, msg.sid);
+      S.wants.set(k, msg.q === "low" ? "low" : "auto");
+      const c = S.outCalls.get(k); if(c) tuneSender(c);
+      break;
+    }
   }
 }
 
-/* ---------------- transmitir ---------------- */
-function friendlyLabel(track){
+/* ---------------- transmitir (telas e câmera) ---------------- */
+function friendlyLabel(track, kind){
   const label = (track?.label || "").trim();
-  const surf = track?.getSettings?.().displaySurface;
-  if(!label || /^(screen|window|web-contents-media-stream|tab):/i.test(label) || /^[A-Za-z0-9+/_-]{20,}$/.test(label)){
+  const st = track?.getSettings?.() || {};
+  if(kind === "camera"){
+    if(st.facingMode === "user" || /facing front/i.test(label)) return "Câmera frontal";
+    if(st.facingMode === "environment" || /facing back/i.test(label)) return "Câmera traseira";
+    return (label || "Câmera").slice(0, 60);
+  }
+  const surf = st.displaySurface;
+  if(!label || /^(screen|window|web-contents-media-stream|tab):/i.test(label) || /^[A-Za-z0-9+/=_-]{20,}$/.test(label)){
     return surf === "monitor" ? "Tela inteira" : surf === "window" ? "Janela" : surf === "browser" ? "Aba do navegador" : "Tela";
   }
   return label.slice(0, 60);
 }
 function readForm(){
   const f = $("#goLiveForm");
-  return { res:f.res.value, fps:Number(f.fps.value), hint:f.hint.value, audio:$("#audioIn").checked, mode:f.mode.value, upload:$("#uploadIn").value };
+  return { res:f.res.value, fps:Number(f.fps.value), hint:f.hint.value || "motion", access:f.access.value || "open", audio:$("#audioIn").checked, mode:f.mode.value, facing:f.facing.value || "user", upload:$("#uploadIn").value };
 }
 const MODE_HELP = {
   stable:"Mede a conexão de cada espectador e baixa a qualidade só o necessário para a imagem não congelar. Volta sozinho quando a rede melhora.",
@@ -690,119 +867,203 @@ const MODE_HELP = {
 };
 function updateModeHelp(){ $("#modeHelp").textContent = MODE_HELP[$("#goLiveForm").mode.value] || ""; }
 $("#goLiveForm").addEventListener("change", updateModeHelp);
-function openModal(mode){
-  S.modalMode = mode;
-  const f = $("#goLiveForm"), s = S.settings;
-  f.res.value = s.res; f.fps.value = String(s.fps); f.hint.value = s.hint; $("#audioIn").checked = s.audio; f.mode.value = s.mode; $("#uploadIn").value = String(s.upload); updateModeHelp();
-  const live = mode === "settings";
-  $("#modalTitle").textContent = live ? "Qualidade da transmissão" : "Transmitir tela";
-  $("#modalSub").textContent = live ? "As mudanças valem na hora para todos que estão assistindo." : "Depois de confirmar, o navegador vai perguntar qual tela, janela ou aba você quer mostrar.";
-  $("#confirmLive").innerHTML = live ? "Aplicar" : icon("screen") + "Escolher tela";
+
+function openModal(mode, kind, sid){
+  const rec = sid ? S.out.get(sid) : null;
+  if(mode === "settings" && !rec) return;
+  kind = rec ? rec.kind : kind;
+  S.modal = {mode, kind, sid};
+  const cam = kind === "camera", live = mode === "settings";
+  const f = $("#goLiveForm"), s = rec ? rec.set : S.prefs[kind];
+  // resoluções válidas para cada tipo
+  const show = (id, on) => { $("#"+id).hidden = !on; $(`label[for="${id}"]`).hidden = !on; };
+  show("r480", cam); show("r1440", !cam); show("rsrc", !cam);
+  $("#resSeg").classList.toggle("three", cam);
+  let res = QUALITY[s.res] ? s.res : (cam ? "720" : "1080");
+  if(cam && (res === "1440" || res === "src")) res = "1080";
+  if(!cam && res === "480") res = "720";
+  f.res.value = res; f.fps.value = String(s.fps); f.hint.value = s.hint || "motion"; f.mode.value = s.mode;
+  f.facing.value = s.facing || "user"; f.access.value = s.access || "open";
+  $("#audioIn").checked = !!s.audio; $("#uploadIn").value = String(S.prefs.upload);
+  updateModeHelp();
+  $("#hintRow").hidden = cam;
+  $("#facingRow").hidden = !cam || live;
   $("#audioRow").hidden = live;
+  $("#audioText").textContent = cam ? "Incluir microfone" : "Incluir áudio";
+  $("#audioHelp").textContent = cam ? "Os amigos vão ouvir você junto com a imagem. Use fone para evitar eco." : 'No Chrome/Edge marque "Compartilhar áudio" na janela de escolha. Áudio de janela única só funciona em abas.';
+  $("#modalTitle").textContent = live ? (cam ? "Qualidade da câmera" : "Qualidade da transmissão") : (cam ? "Transmitir câmera" : "Transmitir tela");
+  $("#modalSub").textContent = live ? "As mudanças valem na hora para todos que estão assistindo."
+    : cam ? "O navegador vai pedir permissão para usar a câmera e o microfone." : "Depois de confirmar, o navegador vai perguntar qual tela, janela ou aba você quer mostrar.";
+  $("#confirmLive").innerHTML = live ? "Aplicar" : icon(cam ? "cam" : "screen") + (cam ? "Abrir câmera" : "Escolher tela");
   $("#goLiveModal").hidden = false;
-  setTimeout(()=>$("#goLiveForm").querySelector("input:checked")?.focus(), 30);
+  setTimeout(()=>$("#goLiveForm").querySelector("input:checked:not([hidden])")?.focus(), 30);
 }
 const closeModal = () => { $("#goLiveModal").hidden = true; };
-$("#goLiveBtn").onclick = () => openModal("start");
-$("#settingsBtn").onclick = () => openModal("settings");
+$("#goLiveBtn").onclick = () => openModal("start", "screen");
+$("#goCamBtn").onclick = () => openModal("start", "camera");
 $("#cancelModal").onclick = closeModal;
 $("#goLiveModal").addEventListener("click", e => { if(e.target.id === "goLiveModal") closeModal(); });
 document.addEventListener("keydown", e => { if(e.key === "Escape" && !$("#goLiveModal").hidden) closeModal(); });
-$("#goLiveForm").onsubmit = async e => {
+$("#goLiveForm").onsubmit = e => {
   e.preventDefault();
-  S.settings = readForm(); saveSettings(); closeModal();
-  if(S.modalMode === "settings") applySettings();
-  else startStream();
+  const v = readForm(), {mode, kind, sid} = S.modal;
+  S.prefs.upload = v.upload;
+  const set = {res:v.res, fps:v.fps, hint:kind === "camera" ? "motion" : v.hint, audio:v.audio, mode:v.mode, access:v.access};
+  if(kind === "camera") set.facing = v.facing;
+  closeModal();
+  if(mode === "settings"){ Object.assign(S.prefs[kind], {res:set.res, fps:set.fps, hint:set.hint, mode:set.mode, access:set.access}); savePrefs(); applySettings(sid, set); }
+  else { Object.assign(S.prefs[kind], set); savePrefs(); startSource(kind, set); }
 };
-$("#stopBtn").onclick = () => stopStream();
-$("#swapBtn").onclick = () => startStream(true);
 
-async function capture(){
-  const q = QUALITY[S.settings.res], fps = S.settings.fps;
+async function capture(kind, set){
+  const q = QUALITY[set.res] || QUALITY["720"], fps = set.fps;
+  if(kind === "camera"){
+    const base = {facingMode:{ideal:set.facing || "user"}, width:{ideal:q.w}, height:{ideal:q.h}, frameRate:{ideal:fps}};
+    const audio = {echoCancellation:true, noiseSuppression:true, autoGainControl:true};
+    try{
+      return await navigator.mediaDevices.getUserMedia({video:base, audio:set.audio ? audio : false});
+    }catch(err){
+      // sem permissão ou sem microfone: tenta só a imagem
+      if(set.audio && (err.name === "NotAllowedError" || err.name === "NotFoundError" || err.name === "OverconstrainedError")){
+        const s = await navigator.mediaDevices.getUserMedia({video:base, audio:false});
+        toast("Transmitindo sem microfone. Libere o microfone no navegador se quiser ser ouvido.", null, 7000);
+        return s;
+      }
+      throw err;
+    }
+  }
   return navigator.mediaDevices.getDisplayMedia({
     video:{ width:{ideal:q.w, max:q.w}, height:{ideal:q.h, max:q.h}, frameRate:{ideal:fps, max:fps} },
-    audio: S.settings.audio ? {echoCancellation:false, noiseSuppression:false, autoGainControl:false} : false,
-    systemAudio: S.settings.audio ? "include" : "exclude",
+    audio: set.audio ? {echoCancellation:false, noiseSuppression:false, autoGainControl:false} : false,
+    systemAudio: set.audio ? "include" : "exclude",
     surfaceSwitching:"include", selfBrowserSurface:"exclude"
   });
 }
 
-async function startStream(isSwap=false){
+// Liga (ou troca, se replaceSid vier) uma fonte ao vivo. Devolve true se deu certo.
+async function startSource(kind, set, replaceSid=null){
+  if(!replaceSid && S.out.size >= MAX_SOURCES){ toast(`Máximo de ${MAX_SOURCES} fontes ao vivo por pessoa.`); return false; }
   let stream;
-  try { stream = await capture(); }
+  try{ stream = await capture(kind, set); }
   catch(err){
-    if(err.name !== "NotAllowedError" && err.name !== "AbortError") toast("Não deu para capturar a tela: " + err.message);
-    return;
+    if(kind === "camera"){
+      const msg = err.name === "NotAllowedError" ? "A câmera está bloqueada. Libere o acesso no navegador e tente de novo."
+        : err.name === "NotFoundError" ? "Não achei nenhuma câmera neste aparelho."
+        : err.name === "NotReadableError" ? "A câmera está em uso por outro aplicativo."
+        : "Não deu para abrir a câmera: " + err.message;
+      toast(msg, null, 7000);
+    } else if(err.name !== "NotAllowedError" && err.name !== "AbortError") toast("Não deu para capturar a tela: " + err.message);
+    return false;
   }
-  const v = stream.getVideoTracks()[0];
-  v.contentHint = S.settings.hint;
-  v.addEventListener("ended", () => { if(S.local === stream) stopStream(); });
-  const old = S.local;
-  S.local = stream;
-  if(old) old.getTracks().forEach(t=>t.stop());
-  // reconecta quem já estava assistindo com a nova captura
-  for(const vid of [...S.outCalls.keys()]){ closeOut(vid, true); callViewer(vid); }
-  publishInfo(true);
-  // Transmitindo a tela inteira, a prévia vira um espelho infinito e gasta processador: fica escondida.
-  if(v.getSettings?.().displaySurface === "monitor"){
-    removeTile("self"); render();
-    if(!isSwap) toast("Você está transmitindo a tela inteira, então a prévia fica escondida. Use \"Ver prévia\" se quiser.", null, 8000);
-  } else ensureSelfTile();
+  const vt = stream.getVideoTracks()[0];
+  vt.contentHint = set.hint === "detail" ? "detail" : "motion";
+  const sid = replaceSid || newSid();
+  const rec = {sid, kind, stream, set:{...set}, label:friendlyLabel(vt, kind)};
+  vt.addEventListener("ended", () => { if(S.out.get(sid)?.stream === stream) stopSource(sid); });
+  const old = S.out.get(sid);
+  S.out.set(sid, rec);
+  if(old) old.stream.getTracks().forEach(t => t.stop());
+  // refaz a conexão de quem já assistia esta fonte
+  for(const k of [...S.outCalls.keys()]){
+    const {owner:vid, sid:s2} = parseKey(k);
+    if(s2 === sid){ closeOut(k, true); callViewer(vid, sid); }
+  }
+  publishStreams();
+  const surf = vt.getSettings?.().displaySurface;
+  if(kind === "screen" && surf === "monitor"){
+    // tela inteira: a prévia vira espelho infinito e gasta processador, então fica escondida
+    removeTile("self:" + sid); render();
+    if(!replaceSid) toast("Você está transmitindo a tela inteira, então a prévia fica escondida. Use \"Prévia\" na lista de pessoas se quiser.", null, 8000);
+  } else ensureSelfTile(sid);
   keepAwake();
-  if(S.settings.audio && !stream.getAudioTracks().length && !isSwap)
+  if(kind === "screen" && set.audio && !stream.getAudioTracks().length && !replaceSid)
     toast("Transmitindo sem áudio. Para incluir som, marque \"Compartilhar áudio\" na janela de escolha.", null, 7000);
-  if(isSwap) toast("Transmissão trocada.");
+  if(replaceSid && !arguments[3]) toast(kind === "camera" ? "Câmera trocada." : "Transmissão trocada.");
+  return true;
+}
+function stopSource(sid){
+  const rec = S.out.get(sid); if(!rec) return;
+  rec.stream.getTracks().forEach(t => t.stop());
+  for(const k of [...S.outCalls.keys()]) if(parseKey(k).sid === sid) closeOut(k, true);
+  for(const k of [...S.wants.keys()]) if(parseKey(k).sid === sid) S.wants.delete(k);
+  S.out.delete(sid);
+  for(const k of [...S.acl.allowed]) if(parseKey(k).sid === sid) S.acl.allowed.delete(k);
+  for(const k of [...S.acl.pending.keys()]) if(parseKey(k).sid === sid) S.acl.pending.delete(k);
+  removeTile("self:" + sid);
+  publishStreams();
+}
+async function flipCamera(sid){
+  const rec = S.out.get(sid); if(!rec) return;
+  const next = rec.set.facing === "environment" ? "user" : "environment";
+  rec.stream.getTracks().forEach(t => t.stop()); // muitos celulares só abrem uma câmera por vez
+  let ok = await startSource("camera", {...rec.set, facing:next}, sid, true);
+  if(!ok) ok = await startSource("camera", {...rec.set}, sid, true);
+  if(!ok) stopSource(sid); else toast(next === "environment" ? "Câmera traseira." : "Câmera frontal.");
+}
+function publishStreams(){
+  updateMe({streams:[...S.out.values()].map(r => ({sid:r.sid, kind:r.kind, label:r.label, res:r.set.res, fps:r.set.fps, hint:r.set.hint, mode:r.set.mode, audio:!!r.stream.getAudioTracks().length, facing:r.set.facing || "user", access:r.set.access || "open"}))});
+  renderDock();
 }
 
-function publishInfo(streaming){
-  const v = S.local?.getVideoTracks()[0];
-  const set = v?.getSettings?.() || {};
-  const info = streaming ? {
-    res:S.settings.res, fps:S.settings.fps, hint:S.settings.hint, mode:S.settings.mode,
-    audio: !!S.local.getAudioTracks().length,
-    label: friendlyLabel(v),
-    w:set.width||0, h:set.height||0
-  } : null;
-  updateMe({streaming, info});
-  $("#goLiveBtn").hidden = streaming; $("#liveBox").hidden = !streaming;
-  if(streaming){
-    $("#liveLabel").textContent = info.label;
-    refreshSpec();
+function renderDock(){
+  const box = $("#sources"); box.innerHTML = "";
+  for(const rec of S.out.values()){
+    const d = el("div", "livebox"); d.dataset.sid = rec.sid;
+    d.innerHTML = `<span class="rec"></span><span class="ksym">${icon(rec.kind === "camera" ? "cam" : "screen")}</span><div class="meta"><b></b><span class="spec mono"></span></div>`;
+    d.querySelector("b").textContent = rec.label;
+    const mk = (title, ic, fn) => { const b = el("button", "btn ghost icon", icon(ic)); b.title = title; b.setAttribute("aria-label", title); b.onclick = fn; d.append(b); };
+    if(rec.kind === "screen") mk("Trocar janela ou tela", "swap", () => startSource("screen", {...rec.set}, rec.sid));
+    else if(IS_TOUCH) mk("Virar câmera", "flip", () => flipCamera(rec.sid));
+    mk("Qualidade", "sliders", () => openModal("settings", rec.kind, rec.sid));
+    const stop = el("button", "btn danger"); stop.innerHTML = icon("stop") + "<span class=\"lbl\">Encerrar</span>"; stop.onclick = () => stopSource(rec.sid);
+    d.append(stop); box.append(d);
+  }
+  const n = S.out.size, full = n >= MAX_SOURCES;
+  const sb = $("#goLiveBtn"), cb = $("#goCamBtn");
+  sb.hidden = !canShare; cb.hidden = !canCamera;
+  sb.disabled = full; cb.disabled = full;
+  sb.title = cb.title = full ? `Máximo de ${MAX_SOURCES} fontes ao vivo` : "";
+  sb.querySelector("span").textContent = n ? "Adicionar tela" : "Transmitir tela";
+  cb.querySelector("span").textContent = n ? "Adicionar câmera" : "Câmera";
+  refreshSpecs();
+}
+function refreshSpecs(){
+  const counts = viewerCounts();
+  for(const rec of S.out.values()){
+    const d = document.querySelector(`.livebox[data-sid="${rec.sid}"]`); if(!d) continue;
+    const lvl = rec.set.mode === "stable" ? Math.max(0, ...[...S.outCalls.values()].filter(c => c._sid === rec.sid).map(c => c._ad?.level || 0)) : 0;
+    const n = counts[keyOf(S.myId, rec.sid)] || 0;
+    const aud = rec.stream.getAudioTracks().length;
+    const sp = d.querySelector(".spec");
+    sp.textContent = `${QUALITY[rec.set.res].label} · ${rec.set.fps}fps${aud ? (rec.kind === "camera" ? " · com microfone" : " · com áudio") : ""}${lvl ? " · ajustando" : ""} · ${n} assistindo`;
+    sp.classList.toggle("adapt", lvl > 0);
+    sp.title = lvl ? "Baixei a qualidade para quem está com conexão fraca, para não travar." : "";
   }
 }
-function refreshSpec(){
-  if(!S.local) return;
-  const lvl = S.settings.mode === "stable" ? Math.max(0, ...[...S.outCalls.values()].map(c => c._ad?.level || 0)) : 0;
-  const audio = !!S.local.getAudioTracks().length;
-  const sp = $("#liveSpec");
-  sp.textContent = `${QUALITY[S.settings.res].label} · ${S.settings.fps}fps${audio ? " · com áudio" : ""}${lvl ? " · ajustando" : ""}`;
-  sp.classList.toggle("adapt", lvl > 0);
-  sp.title = lvl ? "Baixei a qualidade para quem está com conexão fraca, para não travar." : "";
-}
 
-function stopStream(){
-  if(!S.local) return;
-  S.local.getTracks().forEach(t=>t.stop());
-  S.local = null;
-  for(const vid of [...S.outCalls.keys()]) closeOut(vid, true);
-  removeTile("self");
-  publishInfo(false);
-}
-
-async function applySettings(){
-  if(!S.local) return;
-  const v = S.local.getVideoTracks()[0];
-  const q = QUALITY[S.settings.res], fps = S.settings.fps;
-  v.contentHint = S.settings.hint;
-  try{ await v.applyConstraints({width:{ideal:q.w,max:q.w}, height:{ideal:q.h,max:q.h}, frameRate:{ideal:fps,max:fps}}); }
+async function applySettings(sid, set){
+  const rec = S.out.get(sid); if(!rec) return;
+  const wasAsk = rec.set.access === "ask";
+  rec.set = {...rec.set, res:set.res, fps:set.fps, hint:set.hint, mode:set.mode, access:set.access};
+  if(set.access === "ask" && !wasAsk){ // quem já assiste continua; só os novos pedem
+    for(const k of S.outCalls.keys()) if(parseKey(k).sid === sid) S.acl.allowed.add(k);
+  } else if(set.access !== "ask" && wasAsk){ // virou aberta: libera os pedidos pendentes
+    for(const k of [...S.acl.pending.keys()]) if(parseKey(k).sid === sid) answerRequest(k, true);
+  }
+  const vt = rec.stream.getVideoTracks()[0];
+  const q = QUALITY[set.res];
+  vt.contentHint = set.hint === "detail" ? "detail" : "motion";
+  try{ await vt.applyConstraints({width:{ideal:q.w,max:q.w}, height:{ideal:q.h,max:q.h}, frameRate:{ideal:set.fps,max:set.fps}}); }
   catch(e){ toast("Seu navegador não aceitou essa combinação. Tente outra resolução."); }
-  for(const c of S.outCalls.values()){ if(c._ad) c._ad.level = 0; tuneSender(c); }
-  publishInfo(true);
+  for(const c of S.outCalls.values()) if(c._sid === sid){ if(c._ad) c._ad.level = 0; }
+  for(const c of S.outCalls.values()) tuneSender(c); // o limite de upload é dividido entre todas as fontes
+  publishStreams();
   toast("Qualidade atualizada.");
 }
 
-function baseBitrate(){
-  const q = QUALITY[S.settings.res], fps = S.settings.fps;
+/* ---------------- envio: qualidade por espectador ---------------- */
+function baseBitrate(set){
+  const q = QUALITY[set.res] || QUALITY["720"], fps = set.fps;
   const mult = fps >= 60 ? 1.5 : fps <= 15 ? 0.6 : 1;
   return Math.round(q.br * mult * 1000);
 }
@@ -811,25 +1072,30 @@ const LV = {
   motion:{ scale:[1,1.25,1.5,2,3],  fps:[1,1,1,.8,.6],  br:[1,.75,.55,.4,.25] },
   detail:{ scale:[1,1,1,1.25,1.5],  fps:[1,.8,.6,.5,.4], br:[1,.75,.55,.4,.25] }
 };
-const LV_MAX = 4;
+const LV_MAX = 4, LV_LOW = 3; // LV_LOW: nível mínimo para tela pequena (espectador pediu "low")
 function uploadShare(){
-  const u = S.settings.upload;
+  const u = S.prefs.upload;
   if(u === "auto") return Infinity;
   return Number(u) * 1e6 * 0.8 / Math.max(1, S.outCalls.size);
 }
 function paramsFor(call){
-  const lvl = S.settings.mode === "stable" ? Math.min(LV_MAX, call._ad?.level || 0) : 0;
-  const t = LV[S.settings.hint === "detail" ? "detail" : "motion"];
+  const rec = S.out.get(call._sid);
+  const set = rec ? rec.set : S.prefs.screen;
+  const stable = set.mode === "stable";
+  const want = stable && S.wants.get(call._key) === "low" ? LV_LOW : 0;
+  const lvl = stable ? Math.min(LV_MAX, Math.max(call._ad?.level || 0, want)) : 0;
+  const t = LV[set.hint === "detail" ? "detail" : "motion"];
   return {
     scale: t.scale[lvl],
-    fps: Math.max(5, Math.round(S.settings.fps * t.fps[lvl])),
-    br: Math.max(150000, Math.round(Math.min(baseBitrate() * t.br[lvl], uploadShare())))
+    fps: Math.max(5, Math.round(set.fps * t.fps[lvl])),
+    br: Math.max(150000, Math.round(Math.min(baseBitrate(set) * t.br[lvl], uploadShare())))
   };
 }
 function tuneSender(call, tries=0){
   const pc = call.peerConnection;
   const ready = pc && (pc.connectionState === "connected" || pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed");
   if(!ready){ if(tries < 40) setTimeout(()=>tuneSender(call, tries+1), 500); return; }
+  const rec = S.out.get(call._sid);
   const {scale, fps, br} = paramsFor(call);
   for(const s of pc.getSenders()){
     if(!s.track || s.track.kind !== "video") continue;
@@ -838,7 +1104,7 @@ function tuneSender(call, tries=0){
     const e = p.encodings[0];
     e.maxBitrate = br; e.maxFramerate = fps; e.scaleResolutionDownBy = Math.max(1, scale);
     e.priority = "high"; e.networkPriority = "high";
-    p.degradationPreference = S.settings.hint === "motion" ? "maintain-framerate" : "maintain-resolution";
+    p.degradationPreference = rec && rec.set.hint === "detail" ? "maintain-resolution" : "maintain-framerate";
     s.setParameters(p).catch(()=>{});
   }
 }
@@ -866,64 +1132,137 @@ async function adapt(call){
       if(ad.bad >= 2 && ad.level < LV_MAX){
         ad.level++; ad.bad = 0;
         if(Date.now() - ad.upAt < 40000) ad.need = Math.min(45, ad.need * 2); // subiu e piorou de novo: espera mais
-        tuneSender(call); refreshSpec();
+        tuneSender(call); refreshSpecs();
       }
     } else {
       ad.bad = 0; ad.calm++;
-      if(ad.level > 0 && ad.calm >= ad.need){ ad.level--; ad.calm = 0; ad.upAt = Date.now(); tuneSender(call); refreshSpec(); }
+      if(ad.level > 0 && ad.calm >= ad.need){ ad.level--; ad.calm = 0; ad.upAt = Date.now(); tuneSender(call); refreshSpecs(); }
       else if(ad.level === 0 && ad.calm > 30) ad.need = 6;
     }
   }catch(e){} finally{ call._busy = false; }
 }
-setInterval(() => { if(S.local && S.settings.mode === "stable") for(const c of S.outCalls.values()) adapt(c); }, 2000);
+setInterval(() => { for(const c of S.outCalls.values()) if(S.out.get(c._sid)?.set.mode === "stable") adapt(c); }, 2000);
 
-function callViewer(vid){
-  if(!S.local || vid === S.myId || !S.members[vid]) return;
-  closeOut(vid, true);
-  const call = S.peer.call(vid, S.local, {metadata:{kind:"stream"}});
+/* ---------------- privacidade das minhas fontes ---------------- */
+function gate(vid, sid){
+  const rec = S.out.get(sid);
+  if(!rec) return "none";
+  if(S.acl.blocked.has(vid)) return "deny";
+  if(rec.set.access !== "ask") return "ok";
+  return S.acl.allowed.has(keyOf(vid, sid)) ? "ok" : "pending";
+}
+function onWatchRequest(vid, sid){
+  const g = gate(vid, sid), key = keyOf(vid, sid);
+  if(g === "ok") callViewer(vid, sid);
+  else if(g === "deny") send({t:"deny", to:vid, sid, reason:"blocked"});
+  else if(g === "pending"){
+    send({t:"pending", to:vid, sid});
+    if(!S.acl.pending.has(key)){
+      S.acl.pending.set(key, {t:Date.now()});
+      const rec = S.out.get(sid), name = S.members[vid]?.name || "Alguém";
+      toast(`${name} quer ver ${rec?.kind === "camera" ? "sua câmera" : "sua tela"}`, {label:"Ver pedido", fn:() => setTab("people")}, 10000);
+      render();
+    }
+  }
+}
+function answerRequest(key, ok){
+  const {owner:vid, sid} = parseKey(key);
+  if(!S.acl.pending.delete(key)) return;
+  if(ok){ S.acl.allowed.add(key); if(S.out.has(sid)) callViewer(vid, sid); }
+  else send({t:"deny", to:vid, sid, reason:"refused"});
+  render();
+}
+function blockViewer(vid, on){
+  if(on){
+    S.acl.blocked.add(vid);
+    for(const sid of S.out.keys()){
+      const k = keyOf(vid, sid);
+      closeOut(k, true); S.acl.allowed.delete(k); S.acl.pending.delete(k);
+      send({t:"deny", to:vid, sid, reason:"blocked"});
+    }
+    retuneAll();
+  } else S.acl.blocked.delete(vid);
+  render();
+}
+function onDenied(owner, sid, reason){
+  const key = keyOf(owner, sid), w = S.watching.get(key);
+  if(!w) return;
+  try{ w.call?.close(); }catch(e){}
+  S.watching.delete(key); removeTile(key, w.tile); publishWatching();
+  const n = S.members[owner]?.name || "A pessoa";
+  toast(reason === "blocked" ? `${n} não liberou essa transmissão para você.` : `${n} recusou seu pedido para assistir.`, null, 7000);
+  render();
+}
+function callViewer(vid, sid){
+  const rec = S.out.get(sid);
+  if(!rec || vid === S.myId || !S.members[vid]) return;
+  const key = keyOf(vid, sid);
+  closeOut(key, true);
+  const call = S.peer.call(vid, rec.stream, {metadata:{sid, kind:rec.kind}});
   if(!call) return;
-  call._t = Date.now();
-  S.outCalls.set(vid, call);
-  const gone = () => { if(S.outCalls.get(vid) === call){ S.outCalls.delete(vid); retuneAll(); refreshSpec(); } };
+  call._t = Date.now(); call._sid = sid; call._key = key;
+  S.outCalls.set(key, call);
+  const gone = () => { if(S.outCalls.get(key) === call){ S.outCalls.delete(key); retuneAll(); refreshSpecs(); } };
   call.on("close", gone);
   call.on("error", gone);
   tuneSender(call);
   retuneAll();
 }
-function closeOut(vid, silent){
-  const c = S.outCalls.get(vid);
-  if(c){ S.outCalls.delete(vid); try{ c.close(); }catch(e){} if(!silent) retuneAll(); }
+function closeOut(key, silent){
+  const c = S.outCalls.get(key);
+  if(c){ S.outCalls.delete(key); try{ c.close(); }catch(e){} if(!silent) retuneAll(); }
 }
 
 /* ---------------- assistir ---------------- */
-function watch(id){
-  if(id === S.myId){ ensureSelfTile(); setFocus("self"); return; }
-  const m = S.members[id];
-  if(!m || !m.streaming) return;
-  if(S.watching.has(id)){ setFocus(id); return; }
-  const tile = makeTile(id);
-  S.watching.set(id, {call:null, stream:null, tile, stats:null});
-  setStatus(id, "Conectando à transmissão…", true);
-  send({t:"watch", to:id});
+function watch(key){
+  const {owner, sid} = parseKey(key);
+  if(owner === S.myId){ ensureSelfTile(sid); setFocus("self:" + sid); closeDrawers(); return; }
+  const m = S.members[owner];
+  if(!m || !findStream(m, sid)) return;
+  if(S.watching.has(key)){ setFocus(key); closeDrawers(); return; }
+  if(S.watching.size >= MAX_TILES){ toast(`Máximo de ${MAX_TILES} telas ao mesmo tempo. Feche uma para abrir outra.`); return; }
+  const tile = makeTile(key);
+  // com mais de uma tela aberta, só a primeira toca som (as outras começam mudas)
+  if(S.watching.size > 0 || S.selfTiles.size > 0){ tile.querySelector("video").muted = true; syncMuteBtn(tile); }
+  S.watching.set(key, {call:null, stream:null, tile, stall:0});
+  setStatus(key, findStream(m, sid).access === "ask" ? `Pedindo permissão a ${m.name}…` : "Conectando à transmissão…", true);
+  send({t:"watch", to:owner, sid});
   publishWatching();
   layout();
   closeDrawers();
   keepAwake();
+  if(S.watching.size === 2 && !store("codeview-multi-tip")){ store("codeview-multi-tip", "1"); toast("Só uma tela toca som por vez. Toque no alto-falante da tela que quiser ouvir.", null, 7000); }
 }
-function unwatch(id){
-  const w = S.watching.get(id);
+function unwatch(key){
+  const w = S.watching.get(key);
   if(!w) return;
   try{ w.call?.close(); }catch(e){}
-  S.watching.delete(id);
-  removeTile(id);
-  send({t:"unwatch", to:id});
+  S.watching.delete(key);
+  removeTile(key, w.tile);
+  const {owner, sid} = parseKey(key);
+  send({t:"unwatch", to:owner, sid});
   publishWatching();
+}
+function watchAll(){
+  let opened = 0;
+  for(const m of Object.values(S.members)){
+    if(m.id === S.myId) continue;
+    for(const st of streamsOf(m)){
+      const key = keyOf(m.id, st.sid);
+      if(S.watching.has(key)) continue;
+      if(S.watching.size >= MAX_TILES){ toast(`Máximo de ${MAX_TILES} telas ao mesmo tempo.`); return; }
+      watch(key); opened++;
+    }
+  }
+  if(!opened) toast("Você já está assistindo tudo.");
 }
 const publishWatching = () => updateMe({watching:[...S.watching.keys()]});
 
 function onIncomingCall(call){
-  const id = call.peer;
-  const w = S.watching.get(id);
+  const sid = call.metadata && call.metadata.sid;
+  if(!sid){ call.close(); return; }
+  const key = keyOf(call.peer, sid);
+  const w = S.watching.get(key);
   if(!w){ call.close(); return; }
   try{ w.call?.close(); }catch(e){}
   w.call = call;
@@ -936,33 +1275,38 @@ function onIncomingCall(call){
       const pl = v.play();
       if(pl) pl.catch(() => { v.muted = true; syncMuteBtn(w.tile); v.play().catch(()=>{}); w.tile.querySelector(".unmute").hidden = false; });
     }
-    tuneReceiver(call, id);
-    setStatus(id, null);
+    tuneReceiver(call, key);
+    setStatus(key, null);
     const pc = call.peerConnection;
     pc?.addEventListener("iceconnectionstatechange", () => {
       const st = pc.iceConnectionState;
       if(st !== "failed" && st !== "disconnected") return;
       setTimeout(() => {
-        if(S.watching.get(id)?.call === call && ["failed","disconnected","closed"].includes(pc.iceConnectionState)) rewatch(id);
+        if(S.watching.get(key)?.call === call && ["failed","disconnected","closed"].includes(pc.iceConnectionState)) rewatch(key);
       }, st === "failed" ? 500 : 4000);
     });
   });
   call.on("close", () => {
-    if(S.watching.get(id)?.call !== call || !S.members[id]?.streaming) return;
-    setStatus(id, "Reconectando…", true);
-    setTimeout(() => { if(S.watching.get(id)?.call === call && S.members[id]?.streaming) rewatch(id); }, 1500);
+    if(S.watching.get(key)?.call !== call || !isLive(key)) return;
+    setStatus(key, "Reconectando…", true);
+    setTimeout(() => { if(S.watching.get(key)?.call === call && isLive(key)) rewatch(key); }, 1500);
   });
 }
-// pede de novo a transmissão (o anfitrião refaz a chamada do zero)
-function rewatch(id){
-  const w = S.watching.get(id); if(!w) return;
-  setStatus(id, "Recuperando a imagem…", true);
-  send({t:"watch", to:id});
+function isLive(key){ const {owner, sid} = parseKey(key); return !!findStream(S.members[owner], sid); }
+// pede de novo a transmissão (o transmissor refaz a chamada do zero)
+function rewatch(key){
+  const w = S.watching.get(key); if(!w) return;
+  const {owner, sid} = parseKey(key);
+  setStatus(key, "Recuperando a imagem…", true);
+  w.want = null; // reenvia a qualidade pedida junto
+  send({t:"watch", to:owner, sid});
+  queueWants();
 }
 // Estável: buffer um pouco maior absorve oscilação da rede. Máxima: padrão do navegador.
-function tuneReceiver(call, id){
+function tuneReceiver(call, key){
   const pc = call.peerConnection; if(!pc) return;
-  const stable = S.members[id]?.info?.mode !== "max";
+  const {owner, sid} = parseKey(key);
+  const stable = findStream(S.members[owner], sid)?.mode !== "max";
   const ms = stable ? (IS_TOUCH ? 400 : 250) : null;
   for(const r of pc.getReceivers()){
     try{
@@ -971,56 +1315,81 @@ function tuneReceiver(call, id){
     }catch(e){}
   }
 }
+// Tela pequena não precisa de qualidade total: o espectador pede "low" e o transmissor economiza upload.
+let wantsTimer = null;
+function queueWants(){ clearTimeout(wantsTimer); wantsTimer = setTimeout(syncWants, 300); }
+function syncWants(){
+  for(const [key, w] of S.watching){
+    const tw = w.tile.clientWidth || 0;
+    const q = tw && tw < 480 ? "low" : "auto";
+    if(w.want !== q){
+      w.want = q;
+      const {owner, sid} = parseKey(key);
+      send({t:"want", to:owner, sid, q});
+    }
+  }
+}
 
 /* sincroniza com o estado da sala */
 function reconcile(){
-  for(const id of [...S.watching.keys()]){
-    if(!S.members[id] || !S.members[id].streaming){
-      const n = S.members[id]?.name;
-      S.watching.get(id).call?.close?.();
-      S.watching.delete(id); removeTile(id);
-      if(n) toast(`${n} encerrou a transmissão.`);
+  for(const key of [...S.watching.keys()]){
+    if(!isLive(key)){
+      const {owner} = parseKey(key);
+      const n = S.members[owner]?.name;
+      const w = S.watching.get(key);
+      w.call?.close?.();
+      S.watching.delete(key); removeTile(key, w.tile);
+      if(n) toast(`${n} encerrou uma transmissão.`);
       publishWatching();
     }
   }
-  for(const vid of [...S.outCalls.keys()]){
-    const m = S.members[vid];
-    const c = S.outCalls.get(vid);
-    if(!m || (!(m.watching||[]).includes(S.myId) && Date.now() - (c._t||0) > 5000)) closeOut(vid);
+  for(const key of [...S.acl.pending.keys()]){
+    const {owner:vid, sid} = parseKey(key);
+    if(!S.members[vid] || !S.out.has(sid)) S.acl.pending.delete(key);
+  }
+  for(const key of [...S.outCalls.keys()]){
+    const {owner:vid, sid} = parseKey(key);
+    const m = S.members[vid], c = S.outCalls.get(key);
+    const stillWatching = m && (m.watching || []).includes(keyOf(S.myId, sid));
+    if(!m || !S.out.has(sid) || (!stillWatching && Date.now() - (c._t || 0) > 5000)) closeOut(key);
   }
 }
 
 /* ---------------- palco e telas ---------------- */
-function makeTile(id){
+function makeTile(key){
+  const self = key.startsWith("self:");
   const t = el("div","tile");
-  t.dataset.id = id;
+  t.dataset.key = key;
   t.tabIndex = 0;
   t.innerHTML = `
-    <video autoplay playsinline ${id==="self"?"muted":""}></video>
+    <video autoplay playsinline ${self?"muted":""}></video>
     <div class="react-layer"></div>
-    <div class="tile-top"><span class="pill">AO VIVO</span><span class="name"></span>${id==="self"?'<span class="self-badge">VOCÊ</span>':""}<span class="vc">${icon("eye")}<span class="vcn">0</span></span></div>
+    <div class="tile-top"><span class="pill">AO VIVO</span><span class="kic"></span><span class="name"></span>${self?'<span class="self-badge">VOCÊ</span>':""}<span class="vc">${icon("eye")}<span class="vcn">0</span></span></div>
     <div class="stats" hidden></div>
     <div class="tile-status" hidden></div>
     <button class="unmute" hidden>${icon("vol")}Tocar com som</button>
     <div class="tile-bar">
-      ${id==="self" ? "" : `<button class="b-mute" aria-label="Silenciar">${icon("vol")}</button><input type="range" class="b-vol" min="0" max="1" step="0.05" value="1" aria-label="Volume">`}
+      ${self ? "" : `<button class="b-mute" aria-label="Silenciar">${icon("vol")}</button><input type="range" class="b-vol" min="0" max="1" step="0.05" value="1" aria-label="Volume">`}
       <span class="grow"></span>
       <button class="b-stats" title="Estatísticas" aria-label="Estatísticas">${icon("stats")}</button>
       <button class="b-focus" title="Destacar" aria-label="Destacar esta tela">${icon("focus")}</button>
       <button class="b-pip" title="Janela flutuante" aria-label="Janela flutuante">${icon("pip")}</button>
       <button class="b-full" title="Tela cheia" aria-label="Tela cheia">${icon("full")}</button>
-      <button class="b-close" title="${id==="self"?"Esconder prévia":"Parar de assistir"}" aria-label="Fechar">${icon("x")}</button>
+      <button class="b-close" title="${self?"Esconder prévia":"Parar de assistir"}" aria-label="Fechar">${icon("x")}</button>
     </div>`;
   const v = t.querySelector("video");
   const q = s => t.querySelector(s);
-  if(id !== "self"){
-    try{ const vol = Number(store("codeview-vol-"+id)); if(vol>=0 && store("codeview-vol-"+id)!==null){ v.volume = vol; q(".b-vol").value = vol; } }catch(e){}
+  const orient = () => t.classList.toggle("portrait", v.videoHeight > v.videoWidth && v.videoWidth > 0);
+  v.addEventListener("loadedmetadata", orient); v.addEventListener("resize", orient);
+  if(!self){
+    const vk = "codeview-vol-" + parseKey(key).owner;
+    try{ const vol = Number(store(vk)); if(store(vk) !== null && vol >= 0){ v.volume = vol; q(".b-vol").value = vol; } }catch(e){}
     q(".b-mute").onclick = () => { v.muted = !v.muted; if(!v.muted && v.volume===0){ v.volume=.8; q(".b-vol").value=.8; } if(!v.muted) q(".unmute").hidden = true; syncMuteBtn(t); };
-    q(".b-vol").oninput = e => { v.volume = Number(e.target.value); v.muted = v.volume === 0; syncMuteBtn(t); store("codeview-vol-"+id, String(v.volume)); };
+    q(".b-vol").oninput = e => { v.volume = Number(e.target.value); v.muted = v.volume === 0; syncMuteBtn(t); store(vk, String(v.volume)); };
   }
   q(".unmute").onclick = () => { v.muted = false; if(v.volume === 0){ v.volume = .8; const r = q(".b-vol"); if(r) r.value = .8; } q(".unmute").hidden = true; syncMuteBtn(t); v.play().catch(()=>{}); };
   q(".b-stats").onclick = () => { const s=q(".stats"); s.hidden=!s.hidden; q(".b-stats").classList.toggle("on", !s.hidden); };
-  q(".b-focus").onclick = () => setFocus(S.focus === id ? null : id);
+  q(".b-focus").onclick = () => setFocus(S.focus === key ? null : key);
   q(".b-pip").onclick = async () => {
     try{ if(document.pictureInPictureElement === v) await document.exitPictureInPicture(); else await v.requestPictureInPicture(); }
     catch(e){ toast("Janela flutuante não está disponível neste navegador."); }
@@ -1031,7 +1400,7 @@ function makeTile(id){
     const fallback = () => { if(v.webkitEnterFullscreen){ try{ v.webkitEnterFullscreen(); return; }catch(e){} } toast("Tela cheia indisponível aqui."); };
     if(req){ try{ Promise.resolve(req.call(t)).catch(fallback); }catch(e){ fallback(); } } else fallback();
   };
-  q(".b-close").onclick = () => id === "self" ? (removeTile("self"), S.selfHidden = true) : unwatch(id);
+  q(".b-close").onclick = () => self ? removeTile(key) : unwatch(key);
   t.addEventListener("dblclick", e => { if(e.target.closest(".tile-bar")) return; q(".b-full").click(); });
   t.addEventListener("touchstart", () => { t.classList.add("touch"); clearTimeout(t._tt); t._tt = setTimeout(()=>t.classList.remove("touch"), 3500); }, {passive:true});
   return t;
@@ -1040,74 +1409,105 @@ function syncMuteBtn(t){
   const v = t.querySelector("video"), b = t.querySelector(".b-mute");
   if(b) b.innerHTML = icon(v.muted ? "mute" : "vol");
 }
-function setStatus(id, text, spin){
-  const t = id === "self" ? $('.tile[data-id="self"]') : S.watching.get(id)?.tile;
+function tileOf(key){ return key.startsWith("self:") ? S.selfTiles.get(key.slice(5)) : S.watching.get(key)?.tile; }
+function setStatus(key, text, spin){
+  const t = tileOf(key);
   if(!t) return;
   const s = t.querySelector(".tile-status");
   if(!text){ s.hidden = true; return; }
   s.hidden = false; s.innerHTML = (spin?'<div><div class="spin"></div>':"<div>") + "</div>";
   s.firstChild.append(document.createTextNode(text));
 }
-function ensureSelfTile(){
-  if(!S.local) return;
-  let t = $('.tile[data-id="self"]');
-  if(!t){ t = makeTile("self"); S.selfTile = t; }
-  S.selfHidden = false;
+function ensureSelfTile(sid){
+  const rec = S.out.get(sid);
+  if(!rec) return;
+  let t = S.selfTiles.get(sid);
+  if(!t){ t = makeTile("self:" + sid); S.selfTiles.set(sid, t); }
+  t.classList.toggle("mirror", rec.kind === "camera" && (rec.set.facing || "user") === "user");
   const v = t.querySelector("video");
   v.muted = true;
-  if(v.srcObject !== S.local){ v.srcObject = S.local; v.play().catch(()=>{}); }
+  if(v.srcObject !== rec.stream){ v.srcObject = rec.stream; v.play().catch(()=>{}); }
   layout();
 }
-function removeTile(id){
-  const t = id === "self" ? S.selfTile : $(`.tile[data-id="${CSS.escape(id)}"]`);
-  if(id === "self") S.selfTile = null;
+function removeTile(key, tile){
+  const t = tile || tileOf(key);
+  if(key.startsWith("self:")) S.selfTiles.delete(key.slice(5));
   if(t){ if(document.fullscreenElement === t) document.exitFullscreen().catch(()=>{}); t.remove(); }
-  if(S.focus === id) S.focus = null;
+  if(S.focus === key) S.focus = null;
   layout();
 }
-function setFocus(id){ S.focus = id; layout(); }
+function setFocus(key){ S.focus = key; layout(); }
 
 function allTiles(){
-  const list = [];
-  if(S.selfTile && S.local) list.push(S.selfTile);
-  for(const w of S.watching.values()) list.push(w.tile);
-  return list;
+  return [...S.selfTiles.values(), ...[...S.watching.values()].map(w => w.tile)];
 }
 function layout(){
   const stage = $("#stage");
   const tiles = allTiles();
-  if(S.focus && !tiles.some(t => t.dataset.id === S.focus)) S.focus = null;
-  // remove filhos sem destruir os <video>
-  [...stage.children].forEach(c => { if(!c.classList.contains("tile")) c.remove(); });
-  stage.classList.toggle("focus", !!S.focus && tiles.length > 1);
+  if(S.focus && !tiles.some(t => t.dataset.key === S.focus)) S.focus = null;
+  [...stage.children].forEach(c => { if(!c.classList.contains("tile")) c.remove(); }); // sem destruir os <video>
+  const focused = !!S.focus && tiles.length > 1;
+  stage.classList.toggle("focus", focused);
   stage.classList.toggle("single", tiles.length === 1 && !S.focus);
-  if(!tiles.length){ stage.append(emptyState()); return; }
-  if(S.focus && tiles.length > 1){
-    const main = tiles.find(t=>t.dataset.id===S.focus);
+  stage.classList.toggle("many", tiles.length > 2);
+  if(!tiles.length){ stage.style.gridTemplateColumns = ""; stage.classList.remove("odd"); stage.append(emptyState()); updateStagebar(); return; }
+  if(focused){
+    const main = tiles.find(t => t.dataset.key === S.focus);
     const strip = el("div","strip");
     stage.append(main, strip);
-    tiles.filter(t=>t!==main).forEach(t=>strip.append(t));
-  } else {
-    tiles.forEach(t => stage.append(t));
-  }
-  tiles.forEach(t => t.querySelector(".b-focus").classList.toggle("on", S.focus === t.dataset.id));
-  updateTileMeta();
+    tiles.filter(t => t !== main).forEach(t => strip.append(t));
+  } else tiles.forEach(t => stage.append(t));
+  applyCols();
+  tiles.forEach(t => t.querySelector(".b-focus").classList.toggle("on", S.focus === t.dataset.key));
+  updateTileMeta(); updateStagebar(); queueWants();
+}
+// colunas da grade: o mais quadrado possível, sem deixar a tela menor que ~320px
+function applyCols(){
+  const stage = $("#stage"), n = allTiles().length;
+  if((S.focus && n > 1) || n < 2){ stage.style.gridTemplateColumns = ""; stage.classList.remove("odd"); return; }
+  const w = stage.clientWidth || 800;
+  const cols = Math.max(1, Math.min(Math.ceil(Math.sqrt(n)), Math.floor(w / 320)));
+  stage.style.gridTemplateColumns = `repeat(${cols}, minmax(0,1fr))`;
+  stage.classList.toggle("odd", cols === 2 && n % 2 === 1);
+}
+function updateStagebar(){
+  const n = allTiles().length, bar = $("#stagebar");
+  bar.hidden = n < 2;
+  $("#tileCount").textContent = n + " telas abertas";
+  const spot = !!S.focus && n > 1;
+  $("#sbGrid").setAttribute("aria-pressed", String(!spot));
+  $("#sbSpot").setAttribute("aria-pressed", String(spot));
+}
+$("#sbGrid").onclick = () => setFocus(null);
+$("#sbSpot").onclick = () => { const t = allTiles()[0]; if(t) setFocus(S.focus || t.dataset.key); };
+$("#sbClose").onclick = () => { for(const k of [...S.watching.keys()]) unwatch(k); for(const sid of [...S.selfTiles.keys()]) removeTile("self:" + sid); };
+if("ResizeObserver" in window){
+  let rt = null;
+  new ResizeObserver(() => { clearTimeout(rt); rt = setTimeout(() => { applyCols(); queueWants(); }, 120); }).observe($("#stage"));
+}
+function liveOthers(){
+  const list = [];
+  for(const m of Object.values(S.members)) if(m.id !== S.myId) for(const st of streamsOf(m)) list.push({m, st, key:keyOf(m.id, st.sid)});
+  return list;
 }
 function emptyState(){
-  const live = Object.values(S.members).filter(m => m.streaming && m.id !== S.myId);
+  const live = liveOthers();
   const e = el("div","empty");
-  if(S.local && !S.selfTile){
+  if(S.out.size && !S.selfTiles.size){
     e.innerHTML = `<div class="screen">${icon("screen")}</div><h2>Você está ao vivo</h2><p></p><button class="btn">Ver prévia</button>`;
-    const n = viewerCounts()[S.myId] || 0;
+    const counts = viewerCounts();
+    const n = [...S.out.keys()].reduce((a, sid) => a + (counts[keyOf(S.myId, sid)] || 0), 0);
     e.querySelector("p").textContent = n ? `${n} ${n === 1 ? "pessoa está assistindo" : "pessoas estão assistindo"} agora.` : "Ainda ninguém está assistindo. Os amigos veem você na lista de pessoas.";
-    e.querySelector("button").onclick = () => { ensureSelfTile(); };
-    if(live.length){ const row = el("div","row"); row.style.cssText = "flex-wrap:wrap;justify-content:center"; live.forEach(m => { const b = el("button","btn primary"); b.textContent = "Assistir " + m.name; b.onclick = () => watch(m.id); row.append(b); }); e.append(row); }
+    e.querySelector("button").onclick = () => { for(const sid of S.out.keys()) ensureSelfTile(sid); };
+    if(live.length){ const row = el("div","row"); row.style.cssText = "flex-wrap:wrap;justify-content:center"; live.slice(0,4).forEach(x => { const b = el("button","btn primary"); b.textContent = "Assistir " + x.m.name; b.onclick = () => watch(x.key); row.append(b); }); e.append(row); }
   } else if(live.length){
     e.innerHTML = `<div class="screen">${icon("eye")}</div><h2>Tem gente ao vivo</h2><p></p><div class="row" style="flex-wrap:wrap;justify-content:center"></div>`;
-    e.querySelector("p").textContent = live.length === 1 ? `${live[0].name} está transmitindo agora.` : `${live.length} pessoas estão transmitindo agora.`;
-    live.forEach(m => { const b = el("button","btn primary"); b.textContent = "Assistir " + m.name; b.onclick = () => watch(m.id); e.querySelector(".row").append(b); });
+    e.querySelector("p").textContent = live.length === 1 ? `${live[0].m.name} está transmitindo agora.` : `${live.length} transmissões ao vivo agora. Dá para assistir todas juntas.`;
+    const row = e.querySelector(".row");
+    if(live.length > 1){ const b = el("button","btn primary"); b.innerHTML = icon("grid") + "Assistir todas"; b.onclick = watchAll; row.append(b); }
+    live.slice(0,4).forEach(x => { const b = el("button", live.length > 1 ? "btn" : "btn primary"); b.textContent = (x.st.kind === "camera" ? "Câmera de " : "Tela de ") + x.m.name; b.onclick = () => watch(x.key); row.append(b); });
   } else {
-    e.innerHTML = `<div class="screen">${icon("screen")}</div><h2>Ninguém ao vivo ainda</h2><p>Clique em <b>Transmitir tela</b> para mostrar algo, ou espere alguém entrar ao vivo. Convide os amigos com o código <b class="mono"></b>.</p>`;
+    e.innerHTML = `<div class="screen">${icon("screen")}</div><h2>Ninguém ao vivo ainda</h2><p>Clique em <b>Transmitir tela</b> (ou <b>Câmera</b>) para mostrar algo, ou espere alguém entrar ao vivo. Convide os amigos com o código <b class="mono"></b>.</p>`;
     e.querySelector("b.mono").textContent = S.code;
   }
   return e;
@@ -1115,10 +1515,15 @@ function emptyState(){
 function updateTileMeta(){
   const counts = viewerCounts();
   for(const t of allTiles()){
-    const id = t.dataset.id === "self" ? S.myId : t.dataset.id;
-    const m = S.members[id];
-    t.querySelector(".name").textContent = t.dataset.id === "self" ? (S.local ? friendlyLabel(S.local.getVideoTracks()[0]) : "Sua transmissão") : (m?.name || "…");
-    t.querySelector(".vcn").textContent = counts[id] || 0;
+    const key = t.dataset.key, self = key.startsWith("self:");
+    const owner = self ? S.myId : parseKey(key).owner, sid = self ? key.slice(5) : parseKey(key).sid;
+    const m = S.members[owner];
+    const rec = self ? S.out.get(sid) : null;
+    const st = self ? rec : findStream(m, sid);
+    t.querySelector(".kic").innerHTML = icon(st?.kind === "camera" ? "cam" : "screen");
+    const multi = !self && streamsOf(m).length > 1;
+    t.querySelector(".name").textContent = self ? (rec?.label || "Sua transmissão") : ((m?.name || "…") + (multi && st ? " · " + st.label : ""));
+    t.querySelector(".vcn").textContent = counts[keyOf(owner, sid)] || 0;
   }
 }
 function viewerCounts(){
@@ -1130,45 +1535,122 @@ function viewerCounts(){
 /* ---------------- lista de pessoas ---------------- */
 function render(){
   const list = $("#memberList"); list.innerHTML = "";
-  const ms = Object.values(S.members).sort((a,b) => (b.streaming - a.streaming) || (b.host - a.host) || a.name.localeCompare(b.name));
+  const ms = Object.values(S.members).sort((a,b) => (streamsOf(b).length>0) - (streamsOf(a).length>0) || (b.host - a.host) || a.name.localeCompare(b.name));
   $("#countOut").textContent = ms.length;
+  const counts = viewerCounts();
+  const others = liveOthers();
+  const unwatched = others.filter(x => !S.watching.has(x.key)).length;
+  const wa = $("#watchAll");
+  wa.hidden = !(others.length >= 2 && unwatched > 0);
+  $("#watchAllTxt").textContent = `Assistir todas (${others.length})`;
   for(const m of ms){
-    const me = m.id === S.myId;
-    const row = el("div","member" + (m.streaming ? " live" : ""));
+    const me = m.id === S.myId, sts = streamsOf(m);
+    const row = el("div","member" + (sts.length ? " live" : ""));
     const top = el("div","top");
     const av = el("div","av"); av.style.background = colorFor(m.id); av.textContent = initial(m.name);
     const nm = el("div","mname");
     const n = el("span","n"); n.textContent = m.name + (me ? " (você)" : "");
     const s = el("span","s");
-    if(m.streaming && m.info){ s.textContent = `${m.info.label || "Tela"} · ${QUALITY[m.info.res]?.label||""} ${m.info.fps}fps`; s.title = m.info.label; }
-    else s.textContent = m.host ? "Anfitrião" : (m.watching?.length ? "Assistindo" : "Na sala");
+    s.textContent = sts.length ? (sts.length > 1 ? `${sts.length} fontes ao vivo` : "Ao vivo") : (m.host ? "Anfitrião" : ((m.watching||[]).length ? "Assistindo" : "Na sala"));
     nm.append(n, s);
     top.append(av, nm);
-    if(m.streaming){
-      if(me){ const b = el("button","btn watchbtn","Ver prévia"); b.onclick = () => { ensureSelfTile(); setFocus("self"); closeDrawers(); }; top.append(b); }
-      else {
-        const on = S.watching.has(m.id);
-        const b = el("button","btn watchbtn" + (on ? "" : " primary"), on ? "Assistindo" : "Assistir");
-        b.onclick = () => on ? unwatch(m.id) : watch(m.id);
-        b.title = on ? "Parar de assistir" : "Assistir transmissão";
-        top.append(b);
-      }
-    }
     row.append(top);
-    if(m.streaming){
-      const viewers = Object.values(S.members).filter(x => (x.watching||[]).includes(m.id));
-      if(viewers.length){
-        const w = el("div","watchers");
-        viewers.forEach(v => { const sp = el("span"); sp.textContent = v.name; w.append(sp); });
-        row.append(w);
+    for(const st of sts){
+      const key = keyOf(m.id, st.sid), r = el("div","srow");
+      const ic = el("span","ksym", icon(st.kind === "camera" ? "cam" : "screen"));
+      const tx = el("span","st");
+      if(st.access === "ask"){ const lk = el("span","lockic", icon("lock")); lk.title = "Privada: só entra quem a pessoa aceitar"; tx.append(lk); }
+      const b = el("b"); b.textContent = st.label || (st.kind === "camera" ? "Câmera" : "Tela");
+      tx.append(b, document.createTextNode(` · ${QUALITY[st.res]?.label || ""} ${st.fps}fps · ${counts[key] || 0} assistindo`));
+      tx.title = st.label;
+      r.append(ic, tx);
+      if(me){
+        const btn = el("button","btn watchbtn","Prévia"); btn.onclick = () => { ensureSelfTile(st.sid); setFocus("self:" + st.sid); closeDrawers(); }; r.append(btn);
+      } else {
+        const on = S.watching.has(key);
+        const btn = el("button","btn watchbtn" + (on ? "" : " primary"), on ? "Assistindo" : (st.access === "ask" ? "Pedir para ver" : "Assistir"));
+        btn.onclick = () => on ? unwatch(key) : watch(key);
+        btn.title = on ? "Parar de assistir" : "Assistir";
+        r.append(btn);
+        if(S.isHost){
+          const stop = el("button","btn warn", "Parar"); stop.title = "Forçar o fim desta transmissão";
+          stop.onclick = () => armConfirm(stop, "Confirmar?", () => send({t:"stopstream", id:m.id, sid:st.sid}));
+          r.append(stop);
+        }
       }
+      row.append(r);
+    }
+    // pedidos de acesso às MINHAS fontes
+    if(!me) for(const [k] of S.acl.pending){
+      const {owner:vid, sid} = parseKey(k);
+      if(vid !== m.id) continue;
+      const rec = S.out.get(sid); if(!rec) continue;
+      const q = el("div","req"); const t = el("span"); t.textContent = `${m.name} quer ver ${rec.kind === "camera" ? "sua câmera" : "sua tela"} (${rec.label})`;
+      const ok = el("button","btn primary","Aceitar"), no = el("button","btn","Recusar");
+      ok.onclick = () => answerRequest(k, true); no.onclick = () => answerRequest(k, false);
+      q.append(t, ok, no); row.append(q);
+    }
+    // ações sobre a pessoa
+    if(!me){
+      const act = el("div","mact");
+      const blocked = S.acl.blocked.has(m.id);
+      if(S.out.size || blocked){
+        const bb = el("button","btn", blocked ? "Liberar minha tela" : "Bloquear minha tela");
+        bb.title = blocked ? "Deixar essa pessoa pedir para ver de novo" : "Essa pessoa não vê nenhuma das suas transmissões";
+        bb.onclick = () => blockViewer(m.id, !blocked); act.append(bb);
+      }
+      if(S.isHost){
+        const kk = el("button","btn warn","Expulsar"), bn = el("button","btn warn","Banir");
+        kk.title = "Remove da sala (pode voltar com o link)"; bn.title = "Remove e impede de voltar a esta sala";
+        kk.onclick = () => armConfirm(kk, "Confirmar?", () => send({t:"kick", id:m.id}));
+        bn.onclick = () => armConfirm(bn, "Confirmar?", () => send({t:"ban", id:m.id}));
+        act.append(kk, bn);
+      }
+      if(act.children.length) row.append(act);
     }
     list.append(row);
   }
-  if(!S.watching.size && !(S.local && S.selfTile)) layout(); // atualiza o estado vazio
+  if(!S.watching.size && !S.selfTiles.size) layout(); // atualiza o estado vazio
   updateTileMeta();
   updateBadges();
+  refreshSpecs();
+  renderBans();
 }
+$("#watchAll").onclick = watchAll;
+// botão de dois toques: o primeiro arma, o segundo confirma (sem janelas do navegador)
+function armConfirm(btn, label, fn){
+  if(btn._armed){ clearTimeout(btn._armed); btn._armed = null; fn(); return; }
+  const old = btn.textContent; btn.textContent = label; btn.classList.add("primary");
+  btn._armed = setTimeout(() => { btn._armed = null; btn.textContent = old; btn.classList.remove("primary"); }, 3500);
+}
+function renderBans(){
+  const box = $("#banBox"), list = $("#banList");
+  box.hidden = !S.isHost || !S.banned.size;
+  list.innerHTML = "";
+  for(const [cv, info] of S.banned){
+    const r = el("div","banrow"); const n = el("span"); n.textContent = info.name;
+    const b = el("button","btn","Desbanir"); b.onclick = () => send({t:"unban", cv});
+    r.append(n, b); list.append(r);
+  }
+}
+
+/* ---------------- QR code da sala ---------------- */
+function showQr(){
+  const url = roomUrl(S.code);
+  try{
+    const q = qrcode(0, "M"); q.addData(url); q.make();
+    $("#qrBox").innerHTML = q.createSvgTag({cellSize:4, margin:0, scalable:true});
+  }catch(e){ $("#qrBox").textContent = "Não consegui gerar o QR code."; }
+  $("#qrLink").textContent = url;
+  $("#qrModal").hidden = false;
+  $("#qrClose").focus();
+}
+const closeQr = () => { $("#qrModal").hidden = true; };
+$("#qrBtn").onclick = showQr;
+$("#qrClose").onclick = closeQr;
+$("#qrModal").addEventListener("click", e => { if(e.target.id === "qrModal") closeQr(); });
+$("#qrCopy").onclick = async () => { try{ await navigator.clipboard.writeText(roomUrl(S.code)); toast("Link de convite copiado."); }catch(e){ toast("Código da sala: " + S.code, null, 8000); } };
+document.addEventListener("keydown", e => { if(e.key === "Escape" && !$("#qrModal").hidden) closeQr(); });
 
 /* ---------------- chat e reações ---------------- */
 function addMsgNode(node){
@@ -1188,13 +1670,14 @@ function chatMsg(m){
 }
 function setBadge(sel, n){ const b = $(sel); b.hidden = !n; b.textContent = n > 9 ? "9+" : String(n); }
 function updateBadges(){
-  const liveOthers = Object.values(S.members).filter(m => m.streaming && m.id !== S.myId && !S.watching.has(m.id)).length;
-  setBadge("#badgePeople", liveOthers); setBadge("#badgeChat", S.unread);
+  const pending = liveOthers().filter(x => !S.watching.has(x.key)).length + S.acl.pending.size;
+  setBadge("#badgePeople", pending); setBadge("#badgeChat", S.unread);
 }
 function setTab(tab){
   S.tab = tab; $("#room").dataset.tab = tab;
   document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
   if(tab === "chat"){ S.unread = 0; updateBadges(); const box = $("#msgs"); box.scrollTop = box.scrollHeight; }
+  if(tab === "stage") requestAnimationFrame(() => { applyCols(); queueWants(); });
 }
 $("#tabbar").addEventListener("click", e => { const b = e.target.closest(".tab"); if(b) setTab(b.dataset.tab); });
 function sysMsg(text){ const d = el("div","msg sys"); d.textContent = text; addMsgNode(d); }
@@ -1204,10 +1687,11 @@ $("#chatForm").onsubmit = e => {
   send({t:"chat", text:v}); $("#chatIn").value = "";
 };
 function reactTarget(){
-  if(S.focus) return S.focus === "self" ? S.myId : S.focus;
+  if(S.focus){ return S.focus.startsWith("self:") ? keyOf(S.myId, S.focus.slice(5)) : S.focus; }
   const first = [...S.watching.keys()][0];
   if(first) return first;
-  if(S.local) return S.myId;
+  const mine = [...S.out.keys()][0];
+  if(mine) return keyOf(S.myId, mine);
   return null;
 }
 document.addEventListener("click", e => {
@@ -1217,7 +1701,8 @@ document.addEventListener("click", e => {
   send({t:"react", target, emoji:b.dataset.e});
 });
 function showReaction(r){
-  const tile = r.target === S.myId ? S.selfTile : S.watching.get(r.target)?.tile;
+  const {owner, sid} = parseKey(r.target);
+  const tile = owner === S.myId ? S.selfTiles.get(sid) : S.watching.get(r.target)?.tile;
   if(!tile) return;
   const f = el("div","float");
   f.style.left = (10 + Math.random()*75) + "%";
@@ -1227,18 +1712,18 @@ function showReaction(r){
   setTimeout(() => f.remove(), 2700);
 }
 
-/* ---------------- estatísticas ---------------- */
+/* ---------------- vigia e estatísticas ---------------- */
 setInterval(async () => {
   // vigia: se a imagem parar de andar por ~7s, pede a transmissão de novo
-  for(const [id, w] of S.watching){
+  for(const [key, w] of S.watching){
     const v = w.tile.querySelector("video");
     if(!w.call || document.hidden || v.paused || !v.srcObject){ w.stall = 0; continue; }
-    if(v.currentTime !== w.lastT){ w.lastT = v.currentTime; if(w.stall > 0 || w.warn){ setStatus(id, null); w.warn = false; } w.stall = 0; continue; }
+    if(v.currentTime !== w.lastT){ w.lastT = v.currentTime; if(w.stall > 0 || w.warn){ setStatus(key, null); w.warn = false; } w.stall = 0; continue; }
     w.stall = (w.stall || 0) + 1;
-    if(w.stall === 3){ setStatus(id, "Conexão instável…", true); w.warn = true; }
-    if(w.stall >= 7){ rewatch(id); w.stall = -5; }
+    if(w.stall === 3){ setStatus(key, "Conexão instável…", true); w.warn = true; }
+    if(w.stall >= 7){ rewatch(key); w.stall = -5; }
   }
-  for(const [id, w] of S.watching){
+  for(const [key, w] of S.watching){
     const box = w.tile.querySelector(".stats");
     const pc = w.call?.peerConnection;
     if(!pc || box.hidden) continue;
@@ -1259,13 +1744,13 @@ setInterval(async () => {
       box.innerHTML = `<b>${vin.frameWidth||"?"}×${vin.frameHeight||"?"}</b> · ${Math.round(vin.framesPerSecond||0)} fps<br>${(kbps/1000).toFixed(1)} Mbps · ping ${rtt}<br>perda ${lost}% · ${pair && pair.localCandidateId && rep.get(pair.localCandidateId)?.candidateType === "relay" ? "via relay" : "direto P2P"}`;
     }catch(e){}
   }
-  // prévia própria: mostra quantos assistem e qualidade real
-  if(S.selfTile && S.local){
-    const box = S.selfTile.querySelector(".stats");
-    if(!box.hidden){
-      const st = S.local.getVideoTracks()[0]?.getSettings() || {};
-      box.innerHTML = `<b>${st.width||"?"}×${st.height||"?"}</b> · ${Math.round(st.frameRate||0)} fps capturados<br>${S.outCalls.size} conexão(ões) de saída<br>até ${(baseBitrate()/1e6).toFixed(1)} Mbps por pessoa`;
-    }
+  // prévia própria: mostra qualidade real da captura e quantas conexões saem
+  for(const [sid, tile] of S.selfTiles){
+    const box = tile.querySelector(".stats"), rec = S.out.get(sid);
+    if(box.hidden || !rec) continue;
+    const st = rec.stream.getVideoTracks()[0]?.getSettings() || {};
+    const calls = [...S.outCalls.values()].filter(c => c._sid === sid).length;
+    box.innerHTML = `<b>${st.width||"?"}×${st.height||"?"}</b> · ${Math.round(st.frameRate||0)} fps capturados<br>${calls} conexão(ões) de saída<br>até ${(baseBitrate(rec.set)/1e6).toFixed(1)} Mbps por pessoa`;
   }
 }, 1000);
 
@@ -1283,7 +1768,7 @@ function closeDrawers(){ if(MOBILE()) setTab("stage"); }
 
 function teardown(){
   S.ended = true;
-  try{ S.local?.getTracks().forEach(t=>t.stop()); }catch(e){}
+  try{ S.out.forEach(r => r.stream.getTracks().forEach(t => t.stop())); }catch(e){}
   try{ S.peer?.destroy(); }catch(e){}
 }
 function endRoom(title, text){
