@@ -194,6 +194,16 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 .banrow{display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 0}
 .banrow span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .banrow .btn{padding:3px 9px;font-size:12px;min-height:0}
+.cfmodal{align-items:center;text-align:center;width:min(400px,100%);gap:12px}
+.cficon{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:rgba(255,71,87,.14);color:#ff6b78}
+.cficon svg{width:26px;height:26px}
+.cfmodal h2{margin:0;font-size:19px}
+.cfmodal .sub{margin:0}
+.cfmodal .actions{width:100%;justify-content:center;margin-top:6px}
+.cfmodal .actions .btn{flex:1;justify-content:center}
+.srow .btn,.mact .btn{white-space:nowrap;flex:none}
+.mact .btn,.srow .btn.warn{display:inline-flex;align-items:center;gap:5px}
+.mact .btn svg,.srow .btn svg{width:13px;height:13px}
 .qrmodal{align-items:center;text-align:center}
 .qrbox{background:#fff;border-radius:12px;padding:14px;width:min(280px,100%);aspect-ratio:1}
 .qrbox svg{display:block;width:100%;height:100%}
@@ -502,6 +512,18 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
   </div>
 </div>
 
+<div class="scrim" id="confirmModal" hidden>
+  <div class="modal cfmodal" role="alertdialog" aria-labelledby="cfTitle" aria-describedby="cfText">
+    <div class="cficon" id="cfIcon"></div>
+    <h2 id="cfTitle"></h2>
+    <p class="sub" id="cfText"></p>
+    <div class="actions">
+      <button class="btn ghost" type="button" id="cfCancel">Cancelar</button>
+      <button class="btn danger" type="button" id="cfOk"></button>
+    </div>
+  </div>
+</div>
+
 <div class="toasts" id="toasts"></div>
 <div class="overlay-end" id="endOverlay" hidden><div><span class="tally"></span><h2 id="endTitle">A sala foi encerrada</h2><p id="endText">O anfitrião saiu da sala.</p><button class="btn primary" id="backBtn">Voltar ao início</button></div></div>
 
@@ -539,6 +561,7 @@ const S = {
   wants:new Map(),          // "viewerId:sid" -> "low" | "auto" (qualidade pedida pelo espectador)
   watching:new Map(),       // "ownerId:sid" -> {call,stream,tile,...}
   selfTiles:new Map(),      // sid -> tile da minha prévia
+  kicked:new Set(), seen:new Map(), lastHub:Date.now(),
   banned:new Map(),         // anfitrião: cvid -> {name}
   cv:new Map(),             // anfitrião: peerId -> cvid
   acl:{allowed:new Set(), blocked:new Set(), pending:new Map()}, // privacidade das minhas fontes
@@ -718,7 +741,11 @@ function hubAccept(conn){
     return;
   }
   conn.on("open", () => { S.conns.set(conn.peer, conn); S.cv.set(conn.peer, cv); });
-  conn.on("data", msg => hubHandle(conn.peer, msg));
+  conn.on("data", msg => {
+    if(S.kicked.has(conn.peer)) return;
+    if(!S.conns.has(conn.peer)) S.conns.set(conn.peer, conn); // voltou depois de ser dado como ausente
+    hubHandle(conn.peer, msg);
+  });
   conn.on("close", () => hubDrop(conn.peer));
   conn.on("error", () => hubDrop(conn.peer));
 }
@@ -734,6 +761,7 @@ function hubKick(id, ban){
   if(id === S.myId) return;
   const m = S.members[id], c = S.conns.get(id);
   if(!m) return;
+  S.kicked.add(id);
   if(ban){ const cv = S.cv.get(id); S.banned.set(cv || id, {name:m.name}); }
   if(c){ try{ c.send({t:"kicked", ban:!!ban}); }catch(e){} setTimeout(() => { try{ c.close(); }catch(e){} }, 400); }
   S.cv.delete(id);
@@ -763,7 +791,10 @@ function cleanStream(s){
 }
 function hubHandle(from, msg){
   if(!msg || typeof msg !== "object") return;
+  S.seen.set(from, Date.now());
   const m = S.members[from];
+  if(msg.t === "ping"){ if(!m && from !== S.myId) deliver(from, {t:"rehello"}); return; }
+  if(msg.t === "bye"){ if(m && from !== S.myId) hubDrop(from); return; }
   if(msg.to){ if(["watch","unwatch","want","deny","pending"].includes(msg.t)) deliver(msg.to, {...msg, from}); return; }
   switch(msg.t){
     case "hello": {
@@ -795,6 +826,19 @@ function hubHandle(from, msg){
     case "react": if(m) broadcast({t:"react", id:from, name:m.name, target:String(msg.target||"").slice(0,80), emoji:String(msg.emoji||"").slice(0,4)}); break;
   }
 }
+// presença: clientes avisam que estão vivos; o anfitrião tira da lista quem some
+setInterval(() => {
+  if(!S.peer || S.ended) return;
+  if(S.isHost){
+    const now = Date.now();
+    for(const id of [...S.conns.keys()]) if(now - (S.seen.get(id) || now) > 25000) hubDrop(id);
+    for(const c of S.conns.values()){ try{ c.send({t:"hb"}); }catch(e){} }
+  } else if(S.hubConn && S.hubConn.open){
+    try{ S.hubConn.send({t:"ping"}); }catch(e){}
+    if(!document.hidden && Date.now() - S.lastHub > 40000) endRoom("A sala foi encerrada", "Perdi a conexão com o anfitrião.");
+  }
+}, 5000);
+document.addEventListener("visibilitychange", () => { if(!document.hidden){ S.lastHub = Date.now(); if(S.hubConn?.open) try{ S.hubConn.send({t:"ping"}); }catch(e){} } });
 function send(msg){
   if(S.isHost) hubHandle(S.myId, msg);
   else if(S.hubConn && S.hubConn.open) S.hubConn.send(msg);
@@ -824,6 +868,12 @@ function clientHandle(msg){
           else toast(`${b.name} está com ${its.length} transmissões ao vivo`, {label:"Assistir todas", fn:()=>its.forEach(x => watch(keyOf(msg.id, x.sid)))}, 8000);
         }, 700);
       }
+      break;
+    case "hb": S.lastHub = Date.now(); break;
+    case "rehello":
+      send({t:"hello", name:S.myName});
+      if(S.out.size) publishStreams();
+      if(S.watching.size) publishWatching();
       break;
     case "kicked": endRoom(msg.ban ? "Você foi banido" : "Você foi removido", msg.ban ? "O anfitrião baniu você desta sala." : "O anfitrião removeu você da sala."); break;
     case "forcestop":
@@ -1573,8 +1623,8 @@ function render(){
         btn.title = on ? "Parar de assistir" : "Assistir";
         r.append(btn);
         if(S.isHost){
-          const stop = el("button","btn warn", "Parar"); stop.title = "Forçar o fim desta transmissão";
-          stop.onclick = () => armConfirm(stop, "Confirmar?", () => send({t:"stopstream", id:m.id, sid:st.sid}));
+          const stop = el("button","btn warn", icon("stop") + "Parar"); stop.title = "Forçar o fim desta transmissão";
+          stop.onclick = () => askConfirm({icon:"stop", title:`Parar a transmissão de ${m.name}?`, text:"A transmissão é encerrada na hora para todos que estão assistindo. A pessoa pode começar outra.", ok:"Parar transmissão"}, () => send({t:"stopstream", id:m.id, sid:st.sid}));
           r.append(stop);
         }
       }
@@ -1600,10 +1650,10 @@ function render(){
         bb.onclick = () => blockViewer(m.id, !blocked); act.append(bb);
       }
       if(S.isHost){
-        const kk = el("button","btn warn","Expulsar"), bn = el("button","btn warn","Banir");
+        const kk = el("button","btn warn",icon("out") + "Expulsar"), bn = el("button","btn warn",icon("ban") + "Banir");
         kk.title = "Remove da sala (pode voltar com o link)"; bn.title = "Remove e impede de voltar a esta sala";
-        kk.onclick = () => armConfirm(kk, "Confirmar?", () => send({t:"kick", id:m.id}));
-        bn.onclick = () => armConfirm(bn, "Confirmar?", () => send({t:"ban", id:m.id}));
+        kk.onclick = () => askConfirm({icon:"out", title:`Expulsar ${m.name}?`, text:"A pessoa é removida da sala, mas pode voltar usando o link ou o código.", ok:"Expulsar"}, () => send({t:"kick", id:m.id}));
+        bn.onclick = () => askConfirm({icon:"ban", title:`Banir ${m.name}?`, text:"A pessoa é removida e não consegue entrar de novo nesta sala. Você pode desbanir depois pela lista de banidos.", ok:"Banir"}, () => send({t:"ban", id:m.id}));
         act.append(kk, bn);
       }
       if(act.children.length) row.append(act);
@@ -1617,12 +1667,20 @@ function render(){
   renderBans();
 }
 $("#watchAll").onclick = watchAll;
-// botão de dois toques: o primeiro arma, o segundo confirma (sem janelas do navegador)
-function armConfirm(btn, label, fn){
-  if(btn._armed){ clearTimeout(btn._armed); btn._armed = null; fn(); return; }
-  const old = btn.textContent; btn.textContent = label; btn.classList.add("primary");
-  btn._armed = setTimeout(() => { btn._armed = null; btn.textContent = old; btn.classList.remove("primary"); }, 3500);
+// janela de confirmação (no lugar dos botões de dois toques)
+let confirmFn = null;
+function askConfirm(o, fn){
+  confirmFn = fn;
+  $("#cfIcon").innerHTML = icon(o.icon || "ban");
+  $("#cfTitle").textContent = o.title; $("#cfText").textContent = o.text;
+  const ok = $("#cfOk"); ok.innerHTML = icon(o.icon || "ban") + o.ok;
+  $("#confirmModal").hidden = false; $("#cfCancel").focus();
 }
+const closeConfirm = () => { $("#confirmModal").hidden = true; confirmFn = null; };
+$("#cfCancel").onclick = closeConfirm;
+$("#cfOk").onclick = () => { const f = confirmFn; closeConfirm(); if(f) f(); };
+$("#confirmModal").addEventListener("click", e => { if(e.target.id === "confirmModal") closeConfirm(); });
+document.addEventListener("keydown", e => { if(e.key === "Escape" && !$("#confirmModal").hidden) closeConfirm(); });
 function renderBans(){
   const box = $("#banBox"), list = $("#banList");
   box.hidden = !S.isHost || !S.banned.size;
@@ -1777,9 +1835,11 @@ function endRoom(title, text){
   $("#endTitle").textContent = title; $("#endText").textContent = text;
   $("#endOverlay").hidden = false;
 }
-$("#leaveBtn").onclick = () => { teardown(); goHome(); };
+$("#leaveBtn").onclick = () => { bye(); teardown(); goHome(); };
 $("#backBtn").onclick = () => goHome();
-window.addEventListener("beforeunload", () => { try{ S.peer?.destroy(); }catch(e){} });
+const bye = () => { try{ if(!S.isHost && S.hubConn?.open) S.hubConn.send({t:"bye"}); }catch(e){} try{ S.peer?.destroy(); }catch(e){} };
+window.addEventListener("pagehide", bye);
+window.addEventListener("beforeunload", bye);
 })();
 </script>
 </body>
