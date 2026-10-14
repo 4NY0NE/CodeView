@@ -25,7 +25,7 @@
   [headers.values]
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "display-capture=(self), fullscreen=(self), picture-in-picture=(self), camera=(), microphone=(), geolocation=()"
+    Permissions-Policy = "display-capture=(self), camera=(self), microphone=(self), fullscreen=(self), picture-in-picture=(self), geolocation=()"
 
 # O HTML nunca fica em cache, assim cada git push aparece na hora.
 [[headers]]
