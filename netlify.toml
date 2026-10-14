@@ -1,0 +1,49 @@
+# Links de convite bonitos: /sala/K7M2QX abre o app já com o código preenchido.
+[[redirects]]
+  from = "/sala/*"
+  to = "/index.html"
+  status = 200
+
+# Atalho curto para digitar no celular: /s/K7M2QX
+[[redirects]]
+  from = "/s/:code"
+  to = "/sala/:code"
+  status = 301
+
+[[redirects]]
+  from = "/index.html"
+  to = "/"
+  status = 301
+
+[[redirects]]
+  from = "/sala"
+  to = "/"
+  status = 301
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "display-capture=(self), fullscreen=(self), picture-in-picture=(self), camera=(), microphone=(), geolocation=()"
+
+# O HTML nunca fica em cache, assim cada git push aparece na hora.
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/sala/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/*.png"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
+
+[[headers]]
+  for = "/favicon.*"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
