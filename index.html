@@ -199,6 +199,8 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 .cficon svg{width:26px;height:26px}
 .cfmodal h2{margin:0;font-size:19px}
 .cfmodal .sub{margin:0}
+.cficon.good{background:rgba(79,209,197,.14);color:var(--accent)}
+.btn.off{color:#ff8f8f;border-color:rgba(255,143,143,.4)}
 .cfmodal .actions{width:100%;justify-content:center;margin-top:6px}
 .cfmodal .actions .btn{flex:1;justify-content:center}
 .srow .btn,.mact .btn{white-space:nowrap;flex:none}
@@ -345,6 +347,9 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
   <symbol id="i-qr" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h3v3h-3zM20 14v3M14 20h3M20 20h0M17 17v3"/></symbol>
   <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></symbol>
   <symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M6.3 6.3l11.4 11.4"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></symbol>
+  <symbol id="i-micoff" viewBox="0 0 24 24"><path d="M3 3l18 18M9 9v2a3 3 0 005 2M15 10V6a3 3 0 00-5.6-1.5M5 11a7 7 0 0011 5.3M19 11a7 7 0 01-.5 2.6M12 18v3"/></symbol>
+  <symbol id="i-crown" viewBox="0 0 24 24"><path d="M3 8l4 4 5-7 5 7 4-4-2 11H5z"/></symbol>
   <symbol id="i-flip" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0113.7-5.6L20 8M20 4v4h-4M20 12a8 8 0 01-13.7 5.6L4 16M4 20v-4h4"/></symbol>
   <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></symbol>
   <symbol id="i-spot" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="12" rx="2"/><rect x="3" y="18" width="5" height="3" rx="1"/><rect x="10" y="18" width="5" height="3" rx="1"/><rect x="17" y="18" width="4" height="3" rx="1"/></symbol>
@@ -491,6 +496,15 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
         <option value="auto">Automático</option><option value="5">até 5 Mbps</option><option value="10">até 10 Mbps</option><option value="20">até 20 Mbps</option><option value="50">50 Mbps ou mais</option>
       </select>
     </div>
+    <div class="field" id="soundRow"><span class="label">Som da transmissão</span>
+      <div class="seg three">
+        <input type="radio" name="sound" id="sNone" value="none"><label for="sNone">Sem som<small>mudo</small></label>
+        <input type="radio" name="sound" id="sApp" value="app"><label for="sApp">Janela ou aba<small>só dela</small></label>
+        <input type="radio" name="sound" id="sSys" value="system" checked><label for="sSys">Todo o som<small>do computador</small></label>
+      </div>
+      <p class="help">O navegador não deixa escolher aplicativos um a um. Para transmitir o som de só um aplicativo, escolha "Janela ou aba" e compartilhe a aba ou a janela dele. "Todo o som" inclui tudo o que toca no computador, e só aparece ao compartilhar a tela inteira (depende do navegador e do sistema).</p>
+    </div>
+    <label class="check" id="micRow"><input type="checkbox" id="micIn"><span>Incluir meu microfone<small>Mistura sua voz com o som da transmissão. Dá para ligar e desligar o som e o microfone ao vivo.</small></span></label>
     <label class="check" id="audioRow"><input type="checkbox" id="audioIn" checked><span><span id="audioText">Incluir áudio</span><small id="audioHelp">No Chrome/Edge marque "Compartilhar áudio" na janela de escolha. Áudio de janela única só funciona em abas.</small></span></label>
     <div class="actions">
       <button class="btn ghost" type="button" id="cancelModal">Cancelar</button>
@@ -546,7 +560,7 @@ const canShare = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayM
 const canCamera = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 
 const DEFAULT_PREFS = {
-  screen:{res:"1080", fps:30, hint:"motion", audio:true, mode:"stable", access:"open"},
+  screen:{res:"1080", fps:30, hint:"motion", audio:true, sound:"system", mic:false, mode:"stable", access:"open"},
   camera:{res:"720",  fps:30, hint:"motion", audio:true, mode:"stable", facing:"user", access:"open"},
   upload:"auto"
 };
@@ -561,7 +575,8 @@ const S = {
   wants:new Map(),          // "viewerId:sid" -> "low" | "auto" (qualidade pedida pelo espectador)
   watching:new Map(),       // "ownerId:sid" -> {call,stream,tile,...}
   selfTiles:new Map(),      // sid -> tile da minha prévia
-  kicked:new Set(), seen:new Map(), lastHub:Date.now(),
+  kicked:new Set(), seen:new Map(), quiet:new Map(), recentGone:new Map(), lastHub:Date.now(),
+  hubPeer:null, seqMax:0, mySeq:0, hostId:null, migrating:false, grace:0, nextHint:null, inherit:null, acceptSeqUntil:0,
   banned:new Map(),         // anfitrião: cvid -> {name}
   cv:new Map(),             // anfitrião: peerId -> cvid
   acl:{allowed:new Set(), blocked:new Set(), pending:new Map()}, // privacidade das minhas fontes
@@ -582,6 +597,8 @@ for(const k of ["screen","camera"]){
   if(!["motion","detail"].includes(o.hint)) o.hint = "motion";
   if(!["user","environment"].includes(o.facing || "user")) o.facing = "user";
   if(!["open","ask"].includes(o.access)) o.access = "open";
+  if(!["none","app","system"].includes(o.sound)) o.sound = "system";
+  o.mic = !!o.mic;
 }
 if(!["auto","5","10","20","50"].includes(String(S.prefs.upload))) S.prefs.upload = "auto";
 const savePrefs = () => { try{ localStorage.setItem("codeview-prefs", JSON.stringify(S.prefs)); }catch(e){} };
@@ -673,44 +690,164 @@ function basePeer(id){
 }
 function setNet(ok){ $("#netdot").classList.toggle("bad", !ok); $("#netTxt").textContent = ok ? "Conectado" : "Reconectando…"; }
 
+// o hub fica num peer separado do meu, para poder passar de uma pessoa para outra sem derrubar a sala
+function hubPeerFor(code){
+  const hp = new Peer(hubId(code), {debug:1});
+  hp.on("disconnected", () => { if(!S.ended) setTimeout(() => { try{ hp.reconnect(); }catch(e){} }, 1500); });
+  return hp;
+}
 function createRoom(name, code, tries=0){
-  const p = basePeer(hubId(code));
-  p.on("open", id => {
-    S.peer=p; S.isHost=true; S.code=code; S.myId=id; S.myName=name;
-    S.members[id] = {id, name, host:true, streams:[], watching:[]};
-    p.on("connection", hubAccept);
-    enterRoom();
-    sysMsg(`Você criou a sala. Mande o código ${code} para os amigos.`);
+  const hp = hubPeerFor(code);
+  hp.on("open", () => {
+    const p = basePeer();
+    p.on("open", id => {
+      S.peer=p; S.hubPeer=hp; S.isHost=true; S.code=code; S.myId=id; S.myName=name;
+      S.mySeq = ++S.seqMax;
+      S.members[id] = {id, name, host:true, seq:S.mySeq, streams:[], watching:[]};
+      hp.on("connection", hubAccept);
+      enterRoom();
+      sysMsg(`Você criou a sala. Mande o código ${code} para os amigos.`);
+    });
+    p.on("error", handlePeerError);
   });
-  p.on("error", err => {
-    if(err.type === "unavailable-id" && tries < 4){ p.destroy(); createRoom(name, randCode(), tries+1); return; }
+  hp.on("error", err => {
+    if(err.type === "unavailable-id" && tries < 4){ hp.destroy(); createRoom(name, randCode(), tries+1); return; }
     handlePeerError(err);
   });
 }
 
 function joinRoom(name, code){
   const p = basePeer();
-  let joined = false;
   p.on("open", id => {
     S.peer=p; S.code=code; S.myId=id; S.myName=name;
-    const c = p.connect(hubId(code), {reliable:true, serialization:"json", metadata:{name, cvid:CVID}});
-    S.hubConn = c;
-    let entered = false;
-    c.on("open", () => { joined=true; c.send({t:"hello", name}); });
-    c.on("data", msg => { if(msg && msg.t === "state" && !entered){ entered = true; enterRoom(); } clientHandle(msg); });
-    c.on("close", () => { if(joined) endRoom("A sala foi encerrada","O anfitrião saiu ou a conexão caiu."); });
+    openHubConn(true);
   });
   p.on("error", err => {
-    if(err.type === "peer-unavailable" && !joined && String(err.message||"").includes("-hub")){
+    if(err.type === "peer-unavailable" && !S.joined && !S.migrating && String(err.message||"").includes("-hub")){
       p.destroy(); lobbyErr("Sala não encontrada. Confira o código ou peça um convite novo."); return;
     }
     handlePeerError(err);
   });
 }
+// conecta (ou reconecta, depois de trocar de anfitrião) ao hub da sala
+function openHubConn(first){
+  const c = S.peer.connect(hubId(S.code), {reliable:true, serialization:"json", metadata:{name:S.myName, cvid:CVID}});
+  S.hubConn = c;
+  let entered = !first;
+  c.on("open", () => {
+    S.joined = true; S.lastHub = Date.now();
+    c.send({t:"hello", name:S.myName, seq:S.mySeq || 0, re:!first});
+    if(!first) finishMigration(c);
+  });
+  c.on("data", msg => { if(first && msg && msg.t === "state" && !entered){ entered = true; enterRoom(); } clientHandle(msg); });
+  c.on("close", () => { if(S.joined && S.hubConn === c && !S.ended && !S.isHost) startMigration(); });
+  return c;
+}
+
+/* ---- passagem de anfitrião: quando o hub some, o próximo da fila assume o mesmo endereço da sala ---- */
+function candidates(){
+  const old = S.hostId, now = Date.now();
+  // quem acabou de sair da lista (por exemplo, fechou a conexão com o hub antigo um instante antes) ainda conta na fila
+  const pool = {...S.members};
+  for(const [id, g] of S.recentGone) if(now - g.t < 20000 && !pool[id]) pool[id] = g;
+  const list = Object.values(pool).filter(m => m.id !== old).sort((a,b) => (a.seq||0) - (b.seq||0)).map(m => m.id);
+  const h = S.nextHint;
+  if(h && list.includes(h)){ list.splice(list.indexOf(h), 1); list.unshift(h); }
+  return list;
+}
+function successorId(){
+  return Object.values(S.members).filter(m => !m.host && m.id !== S.myId).sort((a,b) => (a.seq||0) - (b.seq||0)).map(m => m.id)[0] || null;
+}
+function startMigration(){
+  if(S.migrating || S.ended || S.isHost) return;
+  S.migrating = true; S.grace = Infinity; S.migStart = Date.now(); S.missingSince = 0;
+  try{ S.hubConn && S.hubConn.close(); }catch(e){}
+  S.hubConn = null;
+  $("#netdot").classList.add("bad"); $("#netTxt").textContent = "Trocando de anfitrião…";
+  sysMsg("O anfitrião saiu. Escolhendo um novo anfitrião…");
+  setTimeout(migTick, 800);
+}
+function migTick(){
+  if(!S.migrating || S.ended) return;
+  const elapsed = Date.now() - S.migStart;
+  if(elapsed > 70000){ endRoom("A sala foi encerrada", "Não consegui reconectar a sala depois que o anfitrião saiu."); return; }
+  const list = candidates(), idx = list.indexOf(S.myId);
+  let rank = idx < 0 ? list.length : idx;
+  if(S.nextHint && S.nextHint !== S.myId) rank = Math.max(rank, 1); // o indicado pelo anfitrião tem a vez primeiro
+  S.onHubMissing = () => {
+    S.onHubMissing = null; console.debug("[mig] hub ausente; vez", rank);
+    if(!S.missingSince) S.missingSince = Date.now();
+    // o primeiro da fila tenta assumir já; os seguintes esperam mais, para a ordem ser respeitada
+    if(Date.now() - S.missingSince >= rank * 5000) claimHub(); else S.migTimer = setTimeout(migTick, 1500);
+  };
+  const c = openHubConn(false);
+  clearTimeout(S.migTimer);
+  S.migTimer = setTimeout(() => { if(S.migrating && S.hubConn === c && !c.open){ S.onHubMissing = null; try{ c.close(); }catch(e){} migTick(); } }, 3000);
+}
+function claimHub(){
+  if(S.claiming || !S.migrating) return;
+  S.claiming = true;
+  const hp = hubPeerFor(S.code);
+  hp.on("open", () => { S.claiming = false; console.debug("[mig] hub reivindicado"); if(S.migrating && !S.ended) promote(hp); else try{ hp.destroy(); }catch(e){} });
+  hp.on("error", err => {
+    if(S.isHost){ handlePeerError(err); return; }
+    S.claiming = false; try{ hp.destroy(); }catch(e){} console.debug("[mig] falhou ao reivindicar", err.type);
+    clearTimeout(S.migTimer); S.migTimer = setTimeout(migTick, err.type === "unavailable-id" ? 1200 : 2000); // outra pessoa chegou antes, ou o servidor ainda não soltou o endereço
+  });
+}
+function promote(hp){
+  clearTimeout(S.migTimer); S.migrating = false; S.onHubMissing = null;
+  try{ S.hubConn && S.hubConn.close(); }catch(e){}
+  S.hubConn = null; S.hubPeer = hp; S.isHost = true;
+  hp.on("connection", hubAccept);
+  hp.on("error", handlePeerError);
+  const old = S.members;
+  S.conns = new Map(); S.seen = new Map(); S.cv = new Map(); S.kicked = new Set(); S.quiet = new Map();
+  S.seqMax = Math.max(S.seqMax, ...Object.values(old).map(m => m.seq || 0), S.mySeq || 0);
+  S.acceptSeqUntil = Date.now() + 60000; // durante a troca, aceita a posição antiga na fila
+  S.members = {}; S.mySeq = S.mySeq || ++S.seqMax;
+  S.members[S.myId] = {id:S.myId, name:S.myName, host:true, seq:S.mySeq, streams:streamList(), watching:[...S.watching.keys()]};
+  if(S.inherit) for(const [cv, nm] of S.inherit) S.banned.set(cv, {name:nm});
+  S.hostId = S.myId;
+  S.grace = Date.now() + 10000; setTimeout(() => { reconcile(); render(); }, 10500);
+  setNet(true);
+  $("#leaveBtn").title = "Sair (outra pessoa vira anfitriã)";
+  sysMsg("Você agora é o anfitrião da sala.");
+  toast("Você agora é o anfitrião da sala.", null, 7000);
+  renderDock(); render();
+}
+function finishMigration(c){
+  clearTimeout(S.migTimer); S.migrating = false; S.onHubMissing = null;
+  S.grace = Date.now() + 10000; setTimeout(() => { reconcile(); render(); }, 10500);
+  setNet(true);
+  if(S.out.size) publishStreams();
+  if(S.watching.size) publishWatching();
+}
+// o anfitrião repassa o comando (botão "Passar anfitrião") e vira participante
+function demote(){
+  if(!S.isHost) return;
+  S.hostId = S.myId; S.isHost = false;
+  const hp = S.hubPeer; S.hubPeer = null;
+  setTimeout(() => { try{ hp && hp.destroy(); }catch(e){} S.conns = new Map(); S.joined = true; startMigration(); }, 700);
+}
+function handoverNow(target){
+  if(!S.isHost) return;
+  const t = target || successorId();
+  if(!t) return;
+  syncInherit(t);
+  for(const c of S.conns.values()){ try{ c.send({t:"newhost", id:t}); }catch(e){} }
+}
+function syncInherit(id){
+  if(!S.isHost || !id) return;
+  deliver(id, {t:"inherit", banned:[...S.banned].map(([cv, i]) => [cv, i.name])});
+}
 
 function handlePeerError(err){
   console.warn("peer error", err.type, err);
-  if(err.type === "peer-unavailable") return; // alguém saiu no meio de uma chamada
+  if(err.type === "peer-unavailable"){
+    if(S.migrating && S.onHubMissing && String(err.message||"").includes("-hub")){ const f = S.onHubMissing; S.onHubMissing = null; f(); }
+    return; // alguém saiu no meio de uma chamada
+  }
   if(err.type === "browser-incompatible"){ lobbyErr("Este navegador não suporta transmissão P2P. Use Chrome, Edge ou Firefox."); return; }
   if(err.type === "network" || err.type === "server-error" || err.type === "socket-error"){
     if($("#room").hidden) lobbyErr("Sem conexão com o servidor de salas. Tente de novo em alguns segundos.");
@@ -724,7 +861,7 @@ function enterRoom(){
   $("#lobby").hidden = true; $("#room").hidden = false;
   $("#codeOut").textContent = S.code;
   setRoomUrl(S.code); document.title = "Sala " + S.code + " · CodeView";
-  $("#leaveBtn").title = S.isHost ? "Sair (a sala fecha para todos)" : "Sair da sala";
+  $("#leaveBtn").title = S.isHost ? "Sair (outra pessoa vira anfitriã)" : "Sair da sala";
   if(!canShare && canCamera && !store("codeview-mobile-tip")){
     store("codeview-mobile-tip", "1");
     setTimeout(() => toast("Pelo celular você pode transmitir a câmera. Para compartilhar a tela, use o computador.", null, 8000), 800);
@@ -762,7 +899,7 @@ function hubKick(id, ban){
   const m = S.members[id], c = S.conns.get(id);
   if(!m) return;
   S.kicked.add(id);
-  if(ban){ const cv = S.cv.get(id); S.banned.set(cv || id, {name:m.name}); }
+  if(ban){ const cv = S.cv.get(id); S.banned.set(cv || id, {name:m.name}); setTimeout(() => syncInherit(successorId()), 50); }
   if(c){ try{ c.send({t:"kicked", ban:!!ban}); }catch(e){} setTimeout(() => { try{ c.close(); }catch(e){} }, 400); }
   S.cv.delete(id);
   hubDrop(id, ban ? `${m.name} foi banido da sala.` : `${m.name} foi removido da sala.`);
@@ -799,9 +936,15 @@ function hubHandle(from, msg){
   switch(msg.t){
     case "hello": {
       const name = String(msg.name||"Visitante").slice(0,24);
-      S.members[from] = {id:from, name, host:false, streams:[], watching:[]};
-      broadcast({t:"sys", text:`${name} entrou na sala.`});
-      broadcastState(); break;
+      const want = Number(msg.seq);
+      const seq = (Date.now() < S.acceptSeqUntil && Number.isInteger(want) && want > 0 && want < 1e6) ? want : ++S.seqMax;
+      S.seqMax = Math.max(S.seqMax, seq);
+      S.members[from] = {id:from, name, host:false, seq, streams:[], watching:[]};
+      if(msg.re) S.quiet.set(from, Date.now() + 6000);
+      else broadcast({t:"sys", text:`${name} entrou na sala.`});
+      broadcastState();
+      if(S.banned.size) syncInherit(successorId());
+      break;
     }
     case "update": {
       if(!m) return;
@@ -810,7 +953,7 @@ function hubHandle(from, msg){
       if(Array.isArray(p.streams)){
         const next = p.streams.slice(0, MAX_SOURCES).map(cleanStream).filter(Boolean);
         const had = new Set(streamsOf(m).map(x => x.sid));
-        fresh = next.filter(x => !had.has(x.sid));
+        fresh = (S.quiet.get(from) || 0) > Date.now() ? [] : next.filter(x => !had.has(x.sid));
         m.streams = next;
       }
       if(Array.isArray(p.watching)) m.watching = p.watching.slice(0,16).map(x => String(x).slice(0,80));
@@ -820,7 +963,8 @@ function hubHandle(from, msg){
     }
     case "kick": if(from === S.myId) hubKick(String(msg.id||""), false); break;
     case "ban": if(from === S.myId) hubKick(String(msg.id||""), true); break;
-    case "unban": if(from === S.myId){ S.banned.delete(String(msg.cv||"")); renderBans(); } break;
+    case "unban": if(from === S.myId){ S.banned.delete(String(msg.cv||"")); renderBans(); syncInherit(successorId()); } break;
+    case "makehost": if(from === S.myId && S.members[msg.id] && msg.id !== S.myId){ const t = msg.id; handoverNow(t); sysMsg(`${S.members[t].name} será o novo anfitrião.`); demote(); } break;
     case "stopstream": if(from === S.myId && msg.id !== S.myId) deliver(String(msg.id||""), {t:"forcestop", sid:String(msg.sid||"")}); break;
     case "chat": if(m) broadcast({t:"chat", id:from, name:m.name, text:String(msg.text||"").slice(0,400), ts:Date.now()}); break;
     case "react": if(m) broadcast({t:"react", id:from, name:m.name, target:String(msg.target||"").slice(0,80), emoji:String(msg.emoji||"").slice(0,4)}); break;
@@ -832,10 +976,11 @@ setInterval(() => {
   if(S.isHost){
     const now = Date.now();
     for(const id of [...S.conns.keys()]) if(now - (S.seen.get(id) || now) > 25000) hubDrop(id);
+    for(const [id, ts] of S.quiet) if(ts < now) S.quiet.delete(id);
     for(const c of S.conns.values()){ try{ c.send({t:"hb"}); }catch(e){} }
   } else if(S.hubConn && S.hubConn.open){
     try{ S.hubConn.send({t:"ping"}); }catch(e){}
-    if(!document.hidden && Date.now() - S.lastHub > 40000) endRoom("A sala foi encerrada", "Perdi a conexão com o anfitrião.");
+    if(!document.hidden && Date.now() - S.lastHub > 20000) startMigration();
   }
 }, 5000);
 document.addEventListener("visibilitychange", () => { if(!document.hidden){ S.lastHub = Date.now(); if(S.hubConn?.open) try{ S.hubConn.send({t:"ping"}); }catch(e){} } });
@@ -849,7 +994,17 @@ const updateMe = patch => send({t:"update", patch});
 const liveBatch = {};
 function clientHandle(msg){
   switch(msg.t){
-    case "state": S.members = msg.members || {}; reconcile(); render(); break;
+    case "state": {
+      const next = msg.members || {};
+      for(const id of Object.keys(S.members)) if(!next[id] && S.members[id].seq) S.recentGone.set(id, {id, seq:S.members[id].seq, name:S.members[id].name, t:Date.now()});
+      for(const id of Object.keys(next)) S.recentGone.delete(id);
+      S.members = next;
+      const h = Object.values(S.members).find(m => m.host); if(h) S.hostId = h.id;
+      const me = S.members[S.myId]; if(me && me.seq) S.mySeq = me.seq;
+      reconcile(); render(); break;
+    }
+    case "newhost": S.nextHint = msg.id; break;
+    case "inherit": S.inherit = Array.isArray(msg.banned) ? msg.banned.slice(0, 200).map(x => [String(x[0]).slice(0,40), String(x[1]).slice(0,24)]) : null; break;
     case "chat": chatMsg(msg); break;
     case "sys": sysMsg(msg.text); break;
     case "react": showReaction(msg); break;
@@ -871,7 +1026,7 @@ function clientHandle(msg){
       break;
     case "hb": S.lastHub = Date.now(); break;
     case "rehello":
-      send({t:"hello", name:S.myName});
+      send({t:"hello", name:S.myName, seq:S.mySeq || 0, re:true});
       if(S.out.size) publishStreams();
       if(S.watching.size) publishWatching();
       break;
@@ -909,7 +1064,7 @@ function friendlyLabel(track, kind){
 }
 function readForm(){
   const f = $("#goLiveForm");
-  return { res:f.res.value, fps:Number(f.fps.value), hint:f.hint.value || "motion", access:f.access.value || "open", audio:$("#audioIn").checked, mode:f.mode.value, facing:f.facing.value || "user", upload:$("#uploadIn").value };
+  return { res:f.res.value, fps:Number(f.fps.value), hint:f.hint.value || "motion", access:f.access.value || "open", audio:$("#audioIn").checked, sound:f.sound.value || "system", mic:$("#micIn").checked, mode:f.mode.value, facing:f.facing.value || "user", upload:$("#uploadIn").value };
 }
 const MODE_HELP = {
   stable:"Mede a conexão de cada espectador e baixa a qualidade só o necessário para a imagem não congelar. Volta sozinho quando a rede melhora.",
@@ -938,9 +1093,12 @@ function openModal(mode, kind, sid){
   updateModeHelp();
   $("#hintRow").hidden = cam;
   $("#facingRow").hidden = !cam || live;
-  $("#audioRow").hidden = live;
-  $("#audioText").textContent = cam ? "Incluir microfone" : "Incluir áudio";
-  $("#audioHelp").textContent = cam ? "Os amigos vão ouvir você junto com a imagem. Use fone para evitar eco." : 'No Chrome/Edge marque "Compartilhar áudio" na janela de escolha. Áudio de janela única só funciona em abas.';
+  $("#audioRow").hidden = live || !cam;
+  $("#soundRow").hidden = live || cam;
+  $("#micRow").hidden = live || cam;
+  f.sound.value = s.sound || "system"; $("#micIn").checked = !!s.mic;
+  $("#audioText").textContent = "Incluir microfone";
+  $("#audioHelp").textContent = "Os amigos vão ouvir você junto com a imagem. Use fone para evitar eco.";
   $("#modalTitle").textContent = live ? (cam ? "Qualidade da câmera" : "Qualidade da transmissão") : (cam ? "Transmitir câmera" : "Transmitir tela");
   $("#modalSub").textContent = live ? "As mudanças valem na hora para todos que estão assistindo."
     : cam ? "O navegador vai pedir permissão para usar a câmera e o microfone." : "Depois de confirmar, o navegador vai perguntar qual tela, janela ou aba você quer mostrar.";
@@ -958,7 +1116,7 @@ $("#goLiveForm").onsubmit = e => {
   e.preventDefault();
   const v = readForm(), {mode, kind, sid} = S.modal;
   S.prefs.upload = v.upload;
-  const set = {res:v.res, fps:v.fps, hint:kind === "camera" ? "motion" : v.hint, audio:v.audio, mode:v.mode, access:v.access};
+  const set = {res:v.res, fps:v.fps, hint:kind === "camera" ? "motion" : v.hint, audio:kind === "camera" ? v.audio : v.sound !== "none", sound:v.sound, mic:kind === "camera" ? v.audio : v.mic, mode:v.mode, access:v.access};
   if(kind === "camera") set.facing = v.facing;
   closeModal();
   if(mode === "settings"){ Object.assign(S.prefs[kind], {res:set.res, fps:set.fps, hint:set.hint, mode:set.mode, access:set.access}); savePrefs(); applySettings(sid, set); }
@@ -971,30 +1129,71 @@ async function capture(kind, set){
     const base = {facingMode:{ideal:set.facing || "user"}, width:{ideal:q.w}, height:{ideal:q.h}, frameRate:{ideal:fps}};
     const audio = {echoCancellation:true, noiseSuppression:true, autoGainControl:true};
     try{
-      return await navigator.mediaDevices.getUserMedia({video:base, audio:set.audio ? audio : false});
+      return {stream: await navigator.mediaDevices.getUserMedia({video:base, audio:set.audio ? audio : false})};
     }catch(err){
       // sem permissão ou sem microfone: tenta só a imagem
       if(set.audio && (err.name === "NotAllowedError" || err.name === "NotFoundError" || err.name === "OverconstrainedError")){
         const s = await navigator.mediaDevices.getUserMedia({video:base, audio:false});
         toast("Transmitindo sem microfone. Libere o microfone no navegador se quiser ser ouvido.", null, 7000);
-        return s;
+        return {stream:s};
       }
       throw err;
     }
   }
-  return navigator.mediaDevices.getDisplayMedia({
+  // som: nenhum, só da janela/aba escolhida, ou todo o som do computador (o navegador decide o que consegue oferecer)
+  const sound = set.sound || (set.audio ? "system" : "none");
+  const stream = await navigator.mediaDevices.getDisplayMedia({
     video:{ width:{ideal:q.w, max:q.w}, height:{ideal:q.h, max:q.h}, frameRate:{ideal:fps, max:fps} },
-    audio: set.audio ? {echoCancellation:false, noiseSuppression:false, autoGainControl:false} : false,
-    systemAudio: set.audio ? "include" : "exclude",
+    audio: sound !== "none" ? {echoCancellation:false, noiseSuppression:false, autoGainControl:false} : false,
+    systemAudio: sound === "system" ? "include" : "exclude",
+    windowAudio: sound === "system" ? "system" : sound === "app" ? "window" : "exclude",
     surfaceSwitching:"include", selfBrowserSurface:"exclude"
   });
+  let micStream = null;
+  if(set.mic && navigator.mediaDevices.getUserMedia){
+    try{ micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}}); }
+    catch(e){ toast("Não consegui usar o microfone. Libere o acesso no navegador e tente de novo.", null, 7000); }
+  }
+  return {stream, micStream};
+}
+
+// Áudio da fonte: som da tela e microfone podem ser ligados e desligados ao vivo, cada um por si.
+function buildAudio(kind, stream, micStream){
+  const A = {sysTrack:null, micTrack:null, on:{sys:true, mic:true}, ctx:null, gSys:null, gMic:null, extra:[]};
+  if(kind === "camera"){ A.micTrack = stream.getAudioTracks()[0] || null; return A; }
+  A.sysTrack = stream.getAudioTracks()[0] || null;
+  A.micTrack = micStream ? micStream.getAudioTracks()[0] || null : null;
+  if(micStream) A.extra.push(micStream);
+  if(A.sysTrack && A.micTrack){
+    try{
+      const ctx = new (window.AudioContext || window.webkitAudioContext)(); A.ctx = ctx;
+      const dest = ctx.createMediaStreamDestination();
+      A.gSys = ctx.createGain(); A.gMic = ctx.createGain();
+      ctx.createMediaStreamSource(new MediaStream([A.sysTrack])).connect(A.gSys).connect(dest);
+      ctx.createMediaStreamSource(new MediaStream([A.micTrack])).connect(A.gMic).connect(dest);
+      if(ctx.resume) ctx.resume();
+      stream.removeTrack(A.sysTrack); stream.addTrack(dest.stream.getAudioTracks()[0]);
+    }catch(e){ A.ctx = A.gSys = A.gMic = null; stream.addTrack(A.micTrack); }
+  } else if(A.micTrack) stream.addTrack(A.micTrack);
+  return A;
+}
+function stopAudio(rec){
+  const A = rec && rec.audio; if(!A) return;
+  try{ A.sysTrack && A.sysTrack.stop(); A.micTrack && A.micTrack.stop(); A.extra.forEach(m => m.getTracks().forEach(t => t.stop())); A.ctx && A.ctx.close(); }catch(e){}
+}
+function setAudioOn(rec, which, on){
+  const A = rec.audio; if(!A) return;
+  A.on[which] = on;
+  if(A.ctx){ (which === "sys" ? A.gSys : A.gMic).gain.value = on ? 1 : 0; }
+  else { const t = which === "sys" ? A.sysTrack : A.micTrack; if(t) t.enabled = on; }
+  renderDock();
 }
 
 // Liga (ou troca, se replaceSid vier) uma fonte ao vivo. Devolve true se deu certo.
 async function startSource(kind, set, replaceSid=null){
   if(!replaceSid && S.out.size >= MAX_SOURCES){ toast(`Máximo de ${MAX_SOURCES} fontes ao vivo por pessoa.`); return false; }
-  let stream;
-  try{ stream = await capture(kind, set); }
+  let stream, micStream;
+  try{ ({stream, micStream} = await capture(kind, set)); }
   catch(err){
     if(kind === "camera"){
       const msg = err.name === "NotAllowedError" ? "A câmera está bloqueada. Libere o acesso no navegador e tente de novo."
@@ -1009,10 +1208,13 @@ async function startSource(kind, set, replaceSid=null){
   vt.contentHint = set.hint === "detail" ? "detail" : "motion";
   const sid = replaceSid || newSid();
   const rec = {sid, kind, stream, set:{...set}, label:friendlyLabel(vt, kind)};
+  const prevOn = S.out.get(sid)?.audio?.on;
+  rec.audio = buildAudio(kind, stream, micStream);
+  if(prevOn){ rec.audio.on = {...prevOn}; for(const w of ["sys","mic"]) if(!prevOn[w]){ const A = rec.audio; if(A.ctx) (w === "sys" ? A.gSys : A.gMic).gain.value = 0; else { const t = w === "sys" ? A.sysTrack : A.micTrack; if(t) t.enabled = false; } } }
   vt.addEventListener("ended", () => { if(S.out.get(sid)?.stream === stream) stopSource(sid); });
   const old = S.out.get(sid);
   S.out.set(sid, rec);
-  if(old) old.stream.getTracks().forEach(t => t.stop());
+  if(old){ old.stream.getTracks().forEach(t => t.stop()); stopAudio(old); }
   // refaz a conexão de quem já assistia esta fonte
   for(const k of [...S.outCalls.keys()]){
     const {owner:vid, sid:s2} = parseKey(k);
@@ -1026,14 +1228,14 @@ async function startSource(kind, set, replaceSid=null){
     if(!replaceSid) toast("Você está transmitindo a tela inteira, então a prévia fica escondida. Use \"Prévia\" na lista de pessoas se quiser.", null, 8000);
   } else ensureSelfTile(sid);
   keepAwake();
-  if(kind === "screen" && set.audio && !stream.getAudioTracks().length && !replaceSid)
-    toast("Transmitindo sem áudio. Para incluir som, marque \"Compartilhar áudio\" na janela de escolha.", null, 7000);
+  if(kind === "screen" && (set.sound || "system") !== "none" && !rec.audio.sysTrack && !replaceSid)
+    toast("Essa janela ou tela não ofereceu som. Para incluir o som, compartilhe uma aba (marcando \"Compartilhar áudio\") ou a tela inteira.", null, 8000);
   if(replaceSid && !arguments[3]) toast(kind === "camera" ? "Câmera trocada." : "Transmissão trocada.");
   return true;
 }
 function stopSource(sid){
   const rec = S.out.get(sid); if(!rec) return;
-  rec.stream.getTracks().forEach(t => t.stop());
+  rec.stream.getTracks().forEach(t => t.stop()); stopAudio(rec);
   for(const k of [...S.outCalls.keys()]) if(parseKey(k).sid === sid) closeOut(k, true);
   for(const k of [...S.wants.keys()]) if(parseKey(k).sid === sid) S.wants.delete(k);
   S.out.delete(sid);
@@ -1050,8 +1252,9 @@ async function flipCamera(sid){
   if(!ok) ok = await startSource("camera", {...rec.set}, sid, true);
   if(!ok) stopSource(sid); else toast(next === "environment" ? "Câmera traseira." : "Câmera frontal.");
 }
+const streamList = () => [...S.out.values()].map(r => ({sid:r.sid, kind:r.kind, label:r.label, res:r.set.res, fps:r.set.fps, hint:r.set.hint, mode:r.set.mode, audio:!!r.stream.getAudioTracks().length, facing:r.set.facing || "user", access:r.set.access || "open"}));
 function publishStreams(){
-  updateMe({streams:[...S.out.values()].map(r => ({sid:r.sid, kind:r.kind, label:r.label, res:r.set.res, fps:r.set.fps, hint:r.set.hint, mode:r.set.mode, audio:!!r.stream.getAudioTracks().length, facing:r.set.facing || "user", access:r.set.access || "open"}))});
+  updateMe({streams:streamList()});
   renderDock();
 }
 
@@ -1061,9 +1264,12 @@ function renderDock(){
     const d = el("div", "livebox"); d.dataset.sid = rec.sid;
     d.innerHTML = `<span class="rec"></span><span class="ksym">${icon(rec.kind === "camera" ? "cam" : "screen")}</span><div class="meta"><b></b><span class="spec mono"></span></div>`;
     d.querySelector("b").textContent = rec.label;
-    const mk = (title, ic, fn) => { const b = el("button", "btn ghost icon", icon(ic)); b.title = title; b.setAttribute("aria-label", title); b.onclick = fn; d.append(b); };
+    const mk = (title, ic, fn) => { const b = el("button", "btn ghost icon", icon(ic)); b.title = title; b.setAttribute("aria-label", title); b.onclick = fn; d.append(b); return b; };
     if(rec.kind === "screen") mk("Trocar janela ou tela", "swap", () => startSource("screen", {...rec.set}, rec.sid));
     else if(IS_TOUCH) mk("Virar câmera", "flip", () => flipCamera(rec.sid));
+    const A = rec.audio;
+    if(A && A.sysTrack){ const b = mk(A.on.sys ? "Silenciar o som da transmissão" : "Ligar o som da transmissão", A.on.sys ? "vol" : "mute", () => setAudioOn(rec, "sys", !A.on.sys)); b.classList.toggle("off", !A.on.sys); b.setAttribute("aria-pressed", String(!A.on.sys)); }
+    if(A && A.micTrack){ const b = mk(A.on.mic ? "Desligar meu microfone" : "Ligar meu microfone", A.on.mic ? "mic" : "micoff", () => setAudioOn(rec, "mic", !A.on.mic)); b.classList.toggle("off", !A.on.mic); b.setAttribute("aria-pressed", String(!A.on.mic)); }
     mk("Qualidade", "sliders", () => openModal("settings", rec.kind, rec.sid));
     const stop = el("button", "btn danger"); stop.innerHTML = icon("stop") + "<span class=\"lbl\">Encerrar</span>"; stop.onclick = () => stopSource(rec.sid);
     d.append(stop); box.append(d);
@@ -1083,9 +1289,11 @@ function refreshSpecs(){
     const d = document.querySelector(`.livebox[data-sid="${rec.sid}"]`); if(!d) continue;
     const lvl = rec.set.mode === "stable" ? Math.max(0, ...[...S.outCalls.values()].filter(c => c._sid === rec.sid).map(c => c._ad?.level || 0)) : 0;
     const n = counts[keyOf(S.myId, rec.sid)] || 0;
-    const aud = rec.stream.getAudioTracks().length;
+    const A = rec.audio, parts = [];
+    if(A && A.sysTrack) parts.push(A.on.sys ? "som" : "som mudo");
+    if(A && A.micTrack) parts.push(A.on.mic ? "microfone" : "microfone desligado");
     const sp = d.querySelector(".spec");
-    sp.textContent = `${QUALITY[rec.set.res].label} · ${rec.set.fps}fps${aud ? (rec.kind === "camera" ? " · com microfone" : " · com áudio") : ""}${lvl ? " · ajustando" : ""} · ${n} assistindo`;
+    sp.textContent = `${QUALITY[rec.set.res].label} · ${rec.set.fps}fps${parts.length ? " · " + parts.join(" + ") : ""}${lvl ? " · ajustando" : ""} · ${n} assistindo`;
     sp.classList.toggle("adapt", lvl > 0);
     sp.title = lvl ? "Baixei a qualidade para quem está com conexão fraca, para não travar." : "";
   }
@@ -1382,9 +1590,17 @@ function syncWants(){
 
 /* sincroniza com o estado da sala */
 function reconcile(){
+  if(Date.now() < S.grace) return; // logo depois de trocar de anfitrião a lista ainda está se refazendo
   for(const key of [...S.watching.keys()]){
-    if(!isLive(key)){
+    const w0 = S.watching.get(key);
+    if(isLive(key)) w0.gone = 0;
+    else {
       const {owner} = parseKey(key);
+      // se a PESSOA sumiu da lista (pode ser só a troca de anfitrião), espera um pouco antes de fechar a tela dela
+      if(!S.members[owner]){
+        w0.gone = w0.gone || Date.now();
+        if(Date.now() - w0.gone < 6000){ setTimeout(reconcile, 6200); continue; }
+      }
       const n = S.members[owner]?.name;
       const w = S.watching.get(key);
       w.call?.close?.();
@@ -1401,7 +1617,13 @@ function reconcile(){
     const {owner:vid, sid} = parseKey(key);
     const m = S.members[vid], c = S.outCalls.get(key);
     const stillWatching = m && (m.watching || []).includes(keyOf(S.myId, sid));
-    if(!m || !S.out.has(sid) || (!stillWatching && Date.now() - (c._t || 0) > 5000)) closeOut(key);
+    if(!m){
+      c._gone = c._gone || Date.now();
+      if(Date.now() - c._gone < 6000){ setTimeout(reconcile, 6200); continue; }
+      closeOut(key); continue;
+    }
+    c._gone = 0;
+    if(!S.out.has(sid) || (!stillWatching && Date.now() - (c._t || 0) > 5000)) closeOut(key);
   }
 }
 
@@ -1654,7 +1876,10 @@ function render(){
         kk.title = "Remove da sala (pode voltar com o link)"; bn.title = "Remove e impede de voltar a esta sala";
         kk.onclick = () => askConfirm({icon:"out", title:`Expulsar ${m.name}?`, text:"A pessoa é removida da sala, mas pode voltar usando o link ou o código.", ok:"Expulsar"}, () => send({t:"kick", id:m.id}));
         bn.onclick = () => askConfirm({icon:"ban", title:`Banir ${m.name}?`, text:"A pessoa é removida e não consegue entrar de novo nesta sala. Você pode desbanir depois pela lista de banidos.", ok:"Banir"}, () => send({t:"ban", id:m.id}));
-        act.append(kk, bn);
+        const mh = el("button","btn",icon("crown") + "Passar anfitrião");
+        mh.title = "Essa pessoa vira o anfitrião e você continua na sala";
+        mh.onclick = () => askConfirm({icon:"crown", tone:"primary", title:`Passar o comando para ${m.name}?`, text:"A pessoa vira anfitriã e passa a moderar a sala. Você continua aqui como participante.", ok:"Passar anfitrião"}, () => send({t:"makehost", id:m.id}));
+        act.append(mh, kk, bn);
       }
       if(act.children.length) row.append(act);
     }
@@ -1673,7 +1898,8 @@ function askConfirm(o, fn){
   confirmFn = fn;
   $("#cfIcon").innerHTML = icon(o.icon || "ban");
   $("#cfTitle").textContent = o.title; $("#cfText").textContent = o.text;
-  const ok = $("#cfOk"); ok.innerHTML = icon(o.icon || "ban") + o.ok;
+  const ok = $("#cfOk"); ok.innerHTML = icon(o.icon || "ban") + o.ok; ok.className = "btn " + (o.tone === "primary" ? "primary" : "danger");
+  $("#cfIcon").classList.toggle("good", o.tone === "primary");
   $("#confirmModal").hidden = false; $("#cfCancel").focus();
 }
 const closeConfirm = () => { $("#confirmModal").hidden = true; confirmFn = null; };
@@ -1826,7 +2052,8 @@ function closeDrawers(){ if(MOBILE()) setTab("stage"); }
 
 function teardown(){
   S.ended = true;
-  try{ S.out.forEach(r => r.stream.getTracks().forEach(t => t.stop())); }catch(e){}
+  try{ S.out.forEach(r => { r.stream.getTracks().forEach(t => t.stop()); stopAudio(r); }); }catch(e){}
+  try{ S.hubPeer?.destroy(); }catch(e){}
   try{ S.peer?.destroy(); }catch(e){}
 }
 function endRoom(title, text){
@@ -1835,9 +2062,13 @@ function endRoom(title, text){
   $("#endTitle").textContent = title; $("#endText").textContent = text;
   $("#endOverlay").hidden = false;
 }
-$("#leaveBtn").onclick = () => { bye(); teardown(); goHome(); };
+$("#leaveBtn").onclick = () => {
+  const wait = S.isHost && S.conns.size ? 600 : 0; // dá tempo do aviso de novo anfitrião chegar
+  try{ if(S.isHost) handoverNow(); else if(S.hubConn?.open) S.hubConn.send({t:"bye"}); }catch(e){}
+  setTimeout(() => { teardown(); goHome(); }, wait);
+};
 $("#backBtn").onclick = () => goHome();
-const bye = () => { try{ if(!S.isHost && S.hubConn?.open) S.hubConn.send({t:"bye"}); }catch(e){} try{ S.peer?.destroy(); }catch(e){} };
+const bye = () => { try{ if(S.isHost) handoverNow(); else if(S.hubConn?.open) S.hubConn.send({t:"bye"}); }catch(e){} try{ S.peer?.destroy(); S.hubPeer?.destroy(); }catch(e){} };
 window.addEventListener("pagehide", bye);
 window.addEventListener("beforeunload", bye);
 })();
