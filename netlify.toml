@@ -47,3 +47,9 @@
   for = "/favicon.*"
   [headers.values]
     Cache-Control = "public, max-age=604800"
+
+# Arquivo que o site consulta para avisar quando sai uma versão nova. Nunca fica em cache.
+[[headers]]
+  for = "/version.json"
+  [headers.values]
+    Cache-Control = "no-store"

@@ -199,6 +199,10 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 .cficon svg{width:26px;height:26px}
 .cfmodal h2{margin:0;font-size:19px}
 .cfmodal .sub{margin:0}
+.notice{position:fixed;left:50%;transform:translateX(-50%);top:calc(64px + env(safe-area-inset-top,0px));z-index:45;display:flex;align-items:center;gap:10px;background:var(--raise);border:1px solid var(--accent);border-radius:12px;padding:10px 10px 10px 14px;box-shadow:0 12px 34px rgba(0,0,0,.5);width:max-content;max-width:min(620px,calc(100vw - 24px));font-size:14px;line-height:1.35}
+.notice span{flex:1;min-width:0}
+.notice .btn{flex:none}
+@media (max-width:620px){.notice{flex-wrap:wrap}.notice span{flex:1 1 100%}.notice .btn.primary{flex:1}}
 .cficon.good{background:rgba(79,209,197,.14);color:var(--accent)}
 .btn.off{color:#ff8f8f;border-color:rgba(255,143,143,.4)}
 .cfmodal .actions{width:100%;justify-content:center;margin-top:6px}
@@ -350,6 +354,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
   <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></symbol>
   <symbol id="i-micoff" viewBox="0 0 24 24"><path d="M3 3l18 18M9 9v2a3 3 0 005 2M15 10V6a3 3 0 00-5.6-1.5M5 11a7 7 0 0011 5.3M19 11a7 7 0 01-.5 2.6M12 18v3"/></symbol>
   <symbol id="i-crown" viewBox="0 0 24 24"><path d="M3 8l4 4 5-7 5 7 4-4-2 11H5z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 11-2.3-5.7L20 8M20 3v5h-5"/></symbol>
   <symbol id="i-flip" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0113.7-5.6L20 8M20 4v4h-4M20 12a8 8 0 01-13.7 5.6L4 16M4 20v-4h4"/></symbol>
   <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></symbol>
   <symbol id="i-spot" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="12" rx="2"/><rect x="3" y="18" width="5" height="3" rx="1"/><rect x="10" y="18" width="5" height="3" rx="1"/><rect x="17" y="18" width="4" height="3" rx="1"/></symbol>
@@ -538,6 +543,12 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
   </div>
 </div>
 
+<div class="notice" id="notice" role="status" hidden>
+  <span id="noticeTxt"></span>
+  <button class="btn primary" id="noticeBtn">Recarregar</button>
+  <button class="btn ghost icon" id="noticeX" aria-label="Dispensar aviso" title="Dispensar"><svg class="i"><use href="#i-x"/></svg></button>
+</div>
+
 <div class="toasts" id="toasts"></div>
 <div class="overlay-end" id="endOverlay" hidden><div><span class="tally"></span><h2 id="endTitle">A sala foi encerrada</h2><p id="endText">O anfitrião saiu da sala.</p><button class="btn primary" id="backBtn">Voltar ao início</button></div></div>
 
@@ -545,6 +556,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 (() => {
 "use strict";
 const PREFIX = "codeview-";
+const BUILD = "2026-10-18.1"; // precisa ser igual ao "build" do version.json a cada versão nova
 const $ = s => document.querySelector(s);
 const QUALITY = {
   "480":  {w:854,  h:480,  br:1200,  label:"480p"},
@@ -575,6 +587,7 @@ const S = {
   wants:new Map(),          // "viewerId:sid" -> "low" | "auto" (qualidade pedida pelo espectador)
   watching:new Map(),       // "ownerId:sid" -> {call,stream,tile,...}
   selfTiles:new Map(),      // sid -> tile da minha prévia
+  lastHeal:new Map(), idTaken:0, dismissedBuild:null,
   kicked:new Set(), seen:new Map(), quiet:new Map(), recentGone:new Map(), lastHub:Date.now(),
   hubPeer:null, seqMax:0, mySeq:0, hostId:null, migrating:false, grace:0, nextHint:null, inherit:null, acceptSeqUntil:0,
   banned:new Map(),         // anfitrião: cvid -> {name}
@@ -680,6 +693,34 @@ $("#lobbyForm").onsubmit = e => {
 };
 if(typeof Peer === "undefined"){ lobbyErr("Não consegui carregar o motor de conexão. Verifique a internet e recarregue."); }
 
+/* ---------------- avisos fixos e versão nova ---------------- */
+// barra que fica na tela até a pessoa agir (toast some sozinho, esta não)
+function showNotice(key, text, btnLabel, fn){
+  S.noticeKey = key;
+  $("#noticeTxt").textContent = text;
+  const b = $("#noticeBtn"); b.textContent = btnLabel; b.onclick = fn;
+  $("#notice").hidden = false;
+}
+function hideNotice(key){ if(!key || S.noticeKey === key){ $("#notice").hidden = true; S.noticeKey = null; } }
+$("#noticeX").onclick = () => { if(S.noticeKey === "version") S.dismissedBuild = S.seenBuild; hideNotice(); };
+async function checkVersion(){
+  if(!HOSTED || S.ended) return;
+  try{
+    const r = await fetch("/version.json?_=" + Date.now(), {cache:"no-store"});
+    if(!r.ok) return;
+    const j = await r.json();
+    if(!j || !j.build) return;
+    if(j.build === BUILD){ hideNotice("version"); return; }
+    S.seenBuild = j.build;
+    if(j.build === S.dismissedBuild) return;
+    const live = S.out && S.out.size;
+    showNotice("version", "Saiu uma versão nova do CodeView. Recomendo recarregar a página para atualizar." + (live ? " Sua transmissão será interrompida, então faça isso quando puder." : ""), "Recarregar", () => location.reload());
+  }catch(e){}
+}
+setTimeout(checkVersion, 15000);
+setInterval(checkVersion, 120000);
+document.addEventListener("visibilitychange", () => { if(!document.hidden) checkVersion(); });
+
 /* ---------------- conexão ---------------- */
 function basePeer(id){
   const p = id ? new Peer(id, {debug:1}) : new Peer({debug:1});
@@ -688,6 +729,22 @@ function basePeer(id){
   p.on("open", () => setNet(true));
   return p;
 }
+// O servidor de sinalização pode derrubar a conexão (troca de rede, suspensão do computador). Sem ele não dá para
+// iniciar nem receber transmissões novas, então tentamos voltar sempre, e não só uma vez.
+function keepSignaling(){
+  if(S.ended) return;
+  for(const p of [S.peer, S.hubPeer]){
+    if(!p) continue;
+    if(p.destroyed){
+      showNotice("dead", "A conexão com o servidor caiu de vez. Recarregue a página para voltar para a sala.", "Recarregar", () => location.reload());
+      continue;
+    }
+    if(p.disconnected){ try{ p.reconnect(); }catch(e){} }
+  }
+  if(S.peer && !S.peer.destroyed && !S.peer.disconnected) hideNotice("dead");
+}
+setInterval(keepSignaling, 4000);
+window.addEventListener("online", () => setTimeout(keepSignaling, 400));
 function setNet(ok){ $("#netdot").classList.toggle("bad", !ok); $("#netTxt").textContent = ok ? "Conectado" : "Reconectando…"; }
 
 // o hub fica num peer separado do meu, para poder passar de uma pessoa para outra sem derrubar a sala
@@ -824,9 +881,12 @@ function finishMigration(c){
   if(S.watching.size) publishWatching();
 }
 // o anfitrião repassa o comando (botão "Passar anfitrião") e vira participante
-function demote(){
+function demote(target){
   if(!S.isHost) return;
   S.hostId = S.myId; S.isHost = false;
+  S.nextHint = target || null; // quem foi indicado tem a vez; eu espero
+  // guarda quem está na sala: ao derrubar o hub, as conexões fecham e a lista local se esvazia
+  for(const m of Object.values(S.members)) if(m.id !== S.myId && m.seq) S.recentGone.set(m.id, {id:m.id, seq:m.seq, name:m.name, t:Date.now()});
   const hp = S.hubPeer; S.hubPeer = null;
   setTimeout(() => { try{ hp && hp.destroy(); }catch(e){} S.conns = new Map(); S.joined = true; startMigration(); }, 700);
 }
@@ -849,6 +909,11 @@ function handlePeerError(err){
     return; // alguém saiu no meio de uma chamada
   }
   if(err.type === "browser-incompatible"){ lobbyErr("Este navegador não suporta transmissão P2P. Use Chrome, Edge ou Firefox."); return; }
+  if(err.type === "unavailable-id" && !$("#room").hidden && !S.isHost){
+    // ao reconectar, o servidor ainda segura meu id antigo: tenta de novo, e se não soltar, pede para recarregar
+    if(++S.idTaken >= 6) showNotice("dead", "Não consegui reconectar ao servidor. Recarregue a página para voltar para a sala.", "Recarregar", () => location.reload());
+    return;
+  }
   if(err.type === "network" || err.type === "server-error" || err.type === "socket-error"){
     if($("#room").hidden) lobbyErr("Sem conexão com o servidor de salas. Tente de novo em alguns segundos.");
     else setNet(false);
@@ -964,7 +1029,7 @@ function hubHandle(from, msg){
     case "kick": if(from === S.myId) hubKick(String(msg.id||""), false); break;
     case "ban": if(from === S.myId) hubKick(String(msg.id||""), true); break;
     case "unban": if(from === S.myId){ S.banned.delete(String(msg.cv||"")); renderBans(); syncInherit(successorId()); } break;
-    case "makehost": if(from === S.myId && S.members[msg.id] && msg.id !== S.myId){ const t = msg.id; handoverNow(t); sysMsg(`${S.members[t].name} será o novo anfitrião.`); demote(); } break;
+    case "makehost": if(from === S.myId && S.members[msg.id] && msg.id !== S.myId){ const t = msg.id; handoverNow(t); sysMsg(`${S.members[t].name} será o novo anfitrião.`); demote(t); } break;
     case "stopstream": if(from === S.myId && msg.id !== S.myId) deliver(String(msg.id||""), {t:"forcestop", sid:String(msg.sid||"")}); break;
     case "chat": if(m) broadcast({t:"chat", id:from, name:m.name, text:String(msg.text||"").slice(0,400), ts:Date.now()}); break;
     case "react": if(m) broadcast({t:"react", id:from, name:m.name, target:String(msg.target||"").slice(0,80), emoji:String(msg.emoji||"").slice(0,4)}); break;
@@ -1270,6 +1335,7 @@ function renderDock(){
     const A = rec.audio;
     if(A && A.sysTrack){ const b = mk(A.on.sys ? "Silenciar o som da transmissão" : "Ligar o som da transmissão", A.on.sys ? "vol" : "mute", () => setAudioOn(rec, "sys", !A.on.sys)); b.classList.toggle("off", !A.on.sys); b.setAttribute("aria-pressed", String(!A.on.sys)); }
     if(A && A.micTrack){ const b = mk(A.on.mic ? "Desligar meu microfone" : "Ligar meu microfone", A.on.mic ? "mic" : "micoff", () => setAudioOn(rec, "mic", !A.on.mic)); b.classList.toggle("off", !A.on.mic); b.setAttribute("aria-pressed", String(!A.on.mic)); }
+    mk("Reenviar a transmissão para todos", "refresh", () => resendSource(rec.sid));
     mk("Qualidade", "sliders", () => openModal("settings", rec.kind, rec.sid));
     const stop = el("button", "btn danger"); stop.innerHTML = icon("stop") + "<span class=\"lbl\">Encerrar</span>"; stop.onclick = () => stopSource(rec.sid);
     d.append(stop); box.append(d);
@@ -1455,16 +1521,61 @@ function callViewer(vid, sid){
   const rec = S.out.get(sid);
   if(!rec || vid === S.myId || !S.members[vid]) return;
   const key = keyOf(vid, sid);
+  // sem sinalização não dá para iniciar a chamada: tenta voltar e repete em seguida (antes isso falhava calado)
+  if(S.peer.disconnected || S.peer.destroyed){
+    try{ S.peer.reconnect(); }catch(e){}
+    clearTimeout(callViewer._t && callViewer._t[key]);
+    (callViewer._t = callViewer._t || {})[key] = setTimeout(() => { if(S.out.has(sid) && !S.outCalls.has(key)) callViewer(vid, sid); }, 3000);
+    return;
+  }
   closeOut(key, true);
   const call = S.peer.call(vid, rec.stream, {metadata:{sid, kind:rec.kind}});
   if(!call) return;
-  call._t = Date.now(); call._sid = sid; call._key = key;
+  call._t = Date.now(); call._sid = sid; call._key = key; call._retry = Date.now();
   S.outCalls.set(key, call);
   const gone = () => { if(S.outCalls.get(key) === call){ S.outCalls.delete(key); retuneAll(); refreshSpecs(); } };
   call.on("close", gone);
   call.on("error", gone);
+  // se a rede dessa chamada cair, o transmissor também tenta refazê-la, sem esperar o espectador pedir
+  const hook = (n=0) => {
+    const pc = call.peerConnection;
+    if(!pc){ if(n < 20) setTimeout(() => hook(n+1), 300); return; }
+    pc.addEventListener("iceconnectionstatechange", () => {
+      const st = pc.iceConnectionState;
+      if(st === "failed") setTimeout(() => retryCall(key, call), 500);
+      else if(st === "disconnected") setTimeout(() => { if(S.outCalls.get(key) === call && pc.iceConnectionState === "disconnected") retryCall(key, call); }, 6000);
+    });
+  };
+  hook();
   tuneSender(call);
   retuneAll();
+}
+function retryCall(key, call){
+  if(S.outCalls.get(key) !== call || Date.now() - (call._retry || 0) < 8000) return;
+  const {owner:vid, sid} = parseKey(key), m = S.members[vid];
+  if(m && (m.watching || []).includes(keyOf(S.myId, sid))) callViewer(vid, sid);
+}
+// Quem transmite é quem sabe quem deveria estar recebendo: se alguém diz que assiste e não há chamada saudável, refaz.
+function healCalls(){
+  if(S.ended || S.migrating || !S.peer || Date.now() < S.grace) return;
+  for(const m of Object.values(S.members)){
+    if(m.id === S.myId) continue;
+    for(const k of (m.watching || [])){
+      const {owner, sid} = parseKey(k);
+      if(owner !== S.myId || !S.out.has(sid) || gate(m.id, sid) !== "ok") continue;
+      const key = keyOf(m.id, sid), c = S.outCalls.get(key);
+      const st = c && c.peerConnection ? c.peerConnection.connectionState : "";
+      const dead = !c || st === "failed" || st === "closed";
+      if(dead && Date.now() - (S.lastHeal.get(key) || 0) > 10000){ S.lastHeal.set(key, Date.now()); callViewer(m.id, sid); }
+    }
+  }
+}
+setInterval(healCalls, 5000);
+// botão "Reenviar": refaz a transmissão para todos que estão assistindo essa fonte
+function resendSource(sid){
+  let n = 0;
+  for(const k of [...S.outCalls.keys()]){ const {owner:vid, sid:s2} = parseKey(k); if(s2 === sid){ callViewer(vid, sid); n++; } }
+  toast(n ? `Reenviando para ${n} ${n === 1 ? "pessoa" : "pessoas"}…` : "Ninguém está recebendo essa transmissão agora.");
 }
 function closeOut(key, silent){
   const c = S.outCalls.get(key);
@@ -1643,6 +1754,7 @@ function makeTile(key){
     <div class="tile-bar">
       ${self ? "" : `<button class="b-mute" aria-label="Silenciar">${icon("vol")}</button><input type="range" class="b-vol" min="0" max="1" step="0.05" value="1" aria-label="Volume">`}
       <span class="grow"></span>
+      ${self ? "" : `<button class="b-refresh" title="Recarregar esta transmissão" aria-label="Recarregar esta transmissão">${icon("refresh")}</button>`}
       <button class="b-stats" title="Estatísticas" aria-label="Estatísticas">${icon("stats")}</button>
       <button class="b-focus" title="Destacar" aria-label="Destacar esta tela">${icon("focus")}</button>
       <button class="b-pip" title="Janela flutuante" aria-label="Janela flutuante">${icon("pip")}</button>
@@ -1660,6 +1772,7 @@ function makeTile(key){
     q(".b-vol").oninput = e => { v.volume = Number(e.target.value); v.muted = v.volume === 0; syncMuteBtn(t); store(vk, String(v.volume)); };
   }
   q(".unmute").onclick = () => { v.muted = false; if(v.volume === 0){ v.volume = .8; const r = q(".b-vol"); if(r) r.value = .8; } q(".unmute").hidden = true; syncMuteBtn(t); v.play().catch(()=>{}); };
+  if(!self) q(".b-refresh").onclick = () => { rewatch(key); toast("Pedi a transmissão de novo."); };
   q(".b-stats").onclick = () => { const s=q(".stats"); s.hidden=!s.hidden; q(".b-stats").classList.toggle("on", !s.hidden); };
   q(".b-focus").onclick = () => setFocus(S.focus === key ? null : key);
   q(".b-pip").onclick = async () => {
@@ -2001,6 +2114,10 @@ setInterval(async () => {
   // vigia: se a imagem parar de andar por ~7s, pede a transmissão de novo
   for(const [key, w] of S.watching){
     const v = w.tile.querySelector("video");
+    if(w.call && v.srcObject && v.paused && !document.hidden){
+      // o navegador pode pausar o vídeo (aba em segundo plano, economia de energia): tenta tocar de novo
+      v.play().catch(() => { v.muted = true; syncMuteBtn(w.tile); v.play().catch(()=>{}); const u = w.tile.querySelector(".unmute"); if(u) u.hidden = false; });
+    }
     if(!w.call || document.hidden || v.paused || !v.srcObject){ w.stall = 0; continue; }
     if(v.currentTime !== w.lastT){ w.lastT = v.currentTime; if(w.stall > 0 || w.warn){ setStatus(key, null); w.warn = false; } w.stall = 0; continue; }
     w.stall = (w.stall || 0) + 1;
