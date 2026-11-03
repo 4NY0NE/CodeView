@@ -92,6 +92,12 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 #codeIn{text-transform:uppercase;letter-spacing:.2em;font-family:var(--f-mono)}
 .err{color:var(--live);font-size:13px;min-height:1em;margin:0}
 .fineprint{font-size:12px;color:var(--dim);margin:0}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent);font:inherit;font-size:13px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;align-self:flex-start}
+.linkbtn:disabled{opacity:.5;cursor:default}
+.diag{display:grid;gap:4px;font-size:13px;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.diag[hidden]{display:none}
+.diag-ok{color:var(--text)}.diag-bad{color:var(--live)}.diag-info{color:var(--dim)}
+.diag-end{margin-top:6px;padding-top:8px;border-top:1px solid var(--line);font-weight:600}
 
 /* ---------- sala ---------- */
 #room{height:100%;display:grid;grid-template-columns:260px minmax(0,1fr) 310px;grid-template-rows:56px minmax(0,1fr) auto}
@@ -384,6 +390,8 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
         <button class="btn" type="submit" id="joinBtn">Entrar</button>
       </div>
       <p class="err" id="lobbyErr" role="alert"></p>
+      <button type="button" class="linkbtn" id="diagBtn">Testar minha conexão</button>
+      <div class="diag" id="diagOut" hidden aria-live="polite"></div>
       <p class="fineprint">Quem cria a sala é o anfitrião: se ele sair, a sala fecha. Para transmitir use Chrome, Edge ou Firefox no computador. Pelo celular dá para assistir.</p>
     </form>
   </div>
@@ -556,7 +564,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 (() => {
 "use strict";
 const PREFIX = "codeview-";
-const BUILD = "2026-10-18.1"; // precisa ser igual ao "build" do version.json a cada versão nova
+const BUILD = "2026-11-03.1"; // precisa ser igual ao "build" do version.json a cada versão nova
 const $ = s => document.querySelector(s);
 const QUALITY = {
   "480":  {w:854,  h:480,  br:1200,  label:"480p"},
@@ -693,6 +701,56 @@ $("#lobbyForm").onsubmit = e => {
 };
 if(typeof Peer === "undefined"){ lobbyErr("Não consegui carregar o motor de conexão. Verifique a internet e recarregue."); }
 
+/* ---------------- teste de conexão ---------------- */
+async function runDiag(){
+  const box = $("#diagOut"), btn = $("#diagBtn");
+  box.hidden = false; box.textContent = ""; btn.disabled = true;
+  const line = (ok, txt) => { const d = el("div", "diag-" + (ok === true ? "ok" : ok === false ? "bad" : "info")); d.textContent = (ok === true ? "✓ " : ok === false ? "✗ " : "… ") + txt; box.append(d); return d; };
+  try{
+    await loadIce();
+    // 1) servidor de salas
+    const l1 = line(null, "Servidor de salas…");
+    const sig = await new Promise(res => {
+      let p; const t = setTimeout(() => { try{ p.destroy(); }catch(e){} res(false); }, 8000);
+      try{ p = new Peer(peerOpts()); }catch(e){ clearTimeout(t); res(false); return; }
+      p.on("open", () => { clearTimeout(t); try{ p.destroy(); }catch(e){} res(true); });
+      p.on("error", () => { clearTimeout(t); try{ p.destroy(); }catch(e){} res(false); });
+    });
+    l1.className = sig ? "diag-ok" : "diag-bad"; l1.textContent = (sig ? "✓ " : "✗ ") + (sig ? "Servidor de salas alcançado" : "Não alcancei o servidor de salas");
+    // 2) candidatos de rede
+    const l2 = line(null, "Procurando caminhos de rede…");
+    const found = {host:0, srflx:0, relay:0, relayTls:0, v6:0};
+    await new Promise(res => {
+      let pc; try{ pc = new RTCPeerConnection({iceServers:ICE.servers}); }catch(e){ res(); return; }
+      const end = () => { clearTimeout(t); try{ pc.close(); }catch(e){} res(); };
+      const t = setTimeout(end, 7000);
+      pc.createDataChannel("x");
+      pc.onicecandidate = e => {
+        if(!e.candidate){ end(); return; }
+        const m = /typ (host|srflx|relay)/.exec(e.candidate.candidate), c = e.candidate;
+        if(!m) return;
+        found[m[1]]++;
+        if(m[1] === "relay" && /tcp/i.test(c.protocol || c.candidate)) found.relayTls++;
+        if((c.address || "").includes(":")) found.v6++;
+      };
+      pc.createOffer().then(o => pc.setLocalDescription(o)).catch(end);
+    });
+    const direct = found.srflx > 0, relay = found.relay > 0;
+    l2.className = (direct || relay) ? "diag-ok" : "diag-bad";
+    l2.textContent = ((direct || relay) ? "✓ " : "✗ ") + `Caminhos: ${found.host} local, ${found.srflx} público, ${found.relay} relay` + (found.v6 ? ", IPv6 ok" : "");
+    line(direct, direct ? "Endereço público descoberto (STUN funciona)" : "Não descobri seu endereço público (STUN bloqueado ou UDP bloqueado)");
+    line(relay, relay ? "Servidor relay respondeu (plano B para redes difíceis)" : "Nenhum relay respondeu: se sua rede ou a do amigo for rígida, a conexão pode falhar");
+    if(HOSTED) line(ICE.custom ? true : null, ICE.custom ? "Relay extra do site ativo (porta 443)" : "Relay extra do site não configurado (usando o padrão)");
+    const v = !sig ? "Seu navegador não chegou ao servidor de salas. Troque de rede, desligue VPN/bloqueadores ou mude o DNS para 1.1.1.1."
+      : (!direct && !relay) ? "Sua rede está bloqueando a conexão. Troque de rede ou desligue VPN, bloqueadores e extensões que desativam o WebRTC."
+      : !relay ? "Dá para conectar com a maioria das pessoas, mas sem plano B. Se algum amigo não entrar, a rede dele ou a sua é rígida: tente 4G/5G."
+      : "Sua conexão está boa para o CodeView.";
+    const d = el("div", "diag-end"); d.textContent = v; box.append(d);
+  }catch(e){ line(false, "Não consegui rodar o teste: " + (e && e.message || e)); }
+  btn.disabled = false;
+}
+$("#diagBtn").onclick = runDiag;
+
 /* ---------------- avisos fixos e versão nova ---------------- */
 // barra que fica na tela até a pessoa agir (toast some sozinho, esta não)
 function showNotice(key, text, btnLabel, fn){
@@ -722,8 +780,34 @@ setInterval(checkVersion, 120000);
 document.addEventListener("visibilitychange", () => { if(!document.hidden) checkVersion(); });
 
 /* ---------------- conexão ---------------- */
+// Servidores de rede. STUN descobre meu endereço público; TURN retransmite quando a conexão direta é bloqueada
+// (internet de casa com CGNAT/NAT rígido, 4G/5G de algumas operadoras, redes de empresa e escola).
+const ICE_BASE = [
+  {urls:["stun:stun.l.google.com:19302","stun:stun1.l.google.com:19302","stun:stun2.l.google.com:19302","stun:stun.cloudflare.com:3478"]},
+  {urls:["turn:eu-0.turn.peerjs.com:3478","turn:us-0.turn.peerjs.com:3478"], username:"peerjs", credential:"peerjsp"}
+];
+const ICE = {servers:ICE_BASE, custom:false, at:0, p:null};
+// pede ao servidor do site um TURN próprio (inclusive em TCP/TLS na porta 443, que quase nenhuma rede bloqueia)
+function loadIce(){
+  if(!HOSTED) return Promise.resolve();
+  if(ICE.p && Date.now() - ICE.at < 4*3600*1000) return ICE.p;
+  ICE.at = Date.now();
+  ICE.p = (async () => {
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 3500);
+    try{
+      const r = await fetch("/api/ice", {cache:"no-store", signal:ctl.signal});
+      if(r.status !== 200) return;
+      const j = await r.json();
+      const extra = (j.iceServers || []).filter(x => x && x.urls);
+      if(extra.length){ ICE.servers = [ICE_BASE[0], ...extra, ICE_BASE[1]]; ICE.custom = true; }
+    }catch(e){} finally{ clearTimeout(t); }
+  })();
+  return ICE.p;
+}
+const peerOpts = () => ({debug:1, config:{iceServers:ICE.servers, iceCandidatePoolSize:2}});
+const NET_TIPS = " Dicas: desligue VPN ou extensões que bloqueiam WebRTC, tente outra rede (por exemplo 4G/5G ou outro Wi-Fi) e use “Testar minha conexão” abaixo.";
 function basePeer(id){
-  const p = id ? new Peer(id, {debug:1}) : new Peer({debug:1});
+  const p = id ? new Peer(id, peerOpts()) : new Peer(peerOpts());
   p.on("call", onIncomingCall);
   p.on("disconnected", () => { setNet(false); if(!S.ended) setTimeout(()=>{ try{ p.reconnect(); }catch(e){} }, 1500); });
   p.on("open", () => setNet(true));
@@ -749,39 +833,95 @@ function setNet(ok){ $("#netdot").classList.toggle("bad", !ok); $("#netTxt").tex
 
 // o hub fica num peer separado do meu, para poder passar de uma pessoa para outra sem derrubar a sala
 function hubPeerFor(code){
-  const hp = new Peer(hubId(code), {debug:1});
+  const hp = new Peer(hubId(code), peerOpts());
   hp.on("disconnected", () => { if(!S.ended) setTimeout(() => { try{ hp.reconnect(); }catch(e){} }, 1500); });
   return hp;
 }
-function createRoom(name, code, tries=0){
+const MSG_SIGNAL = "Não consegui falar com o servidor de salas. Sua rede pode estar bloqueando a conexão (firewall, DNS, VPN ou rede da empresa/escola)." ;
+function lobbyInfo(t){ $("#lobbyErr").textContent = t || ""; }
+async function createRoom(name, code, tries=0, attempt=0){
+  lobbyInfo("Conectando…");
+  await loadIce();
   const hp = hubPeerFor(code);
-  hp.on("open", () => {
-    const p = basePeer();
-    p.on("open", id => {
+  let done = false, p = null;
+  const fail = msg => { if(done) return; done = true; clearTimeout(sigT); try{ hp.destroy(); }catch(e){} try{ p && p.destroy(); }catch(e){} lobbyErr(msg); };
+  const retry = () => { done = true; clearTimeout(sigT); try{ hp.destroy(); }catch(e){} try{ p && p.destroy(); }catch(e){} lobbyInfo("Demorou, tentando de novo…"); createRoom(name, code, tries, attempt+1); };
+  const sigT = setTimeout(() => { if(done) return; if(attempt < 1) retry(); else fail(MSG_SIGNAL + NET_TIPS); }, 9000);
+  hp.once("open", () => {
+    if(done){ try{ hp.destroy(); }catch(e){} return; }
+    p = basePeer();
+    p.once("open", id => {
+      if(done){ try{ p.destroy(); hp.destroy(); }catch(e){} return; }
+      done = true; clearTimeout(sigT);
       S.peer=p; S.hubPeer=hp; S.isHost=true; S.code=code; S.myId=id; S.myName=name;
       S.mySeq = ++S.seqMax;
       S.members[id] = {id, name, host:true, seq:S.mySeq, streams:[], watching:[]};
       hp.on("connection", hubAccept);
+      lobbyInfo("");
       enterRoom();
       sysMsg(`Você criou a sala. Mande o código ${code} para os amigos.`);
     });
-    p.on("error", handlePeerError);
+    p.on("error", err => { if(done && !S.isHost) return; handlePeerError(err); });
   });
   hp.on("error", err => {
-    if(err.type === "unavailable-id" && tries < 4){ hp.destroy(); createRoom(name, randCode(), tries+1); return; }
-    handlePeerError(err);
+    if(done && S.isHost){ handlePeerError(err); return; }
+    if(done) return;
+    if(err.type === "unavailable-id" && tries < 4){ done = true; clearTimeout(sigT); hp.destroy(); createRoom(name, randCode(), tries+1); return; }
+    if(["network","server-error","socket-error","socket-closed"].includes(err.type)){ if(attempt < 1) retry(); else fail(MSG_SIGNAL + NET_TIPS); return; }
+    fail("Não deu para criar a sala: " + err.type);
   });
 }
 
-function joinRoom(name, code){
+async function joinRoom(name, code, attempt=0){
+  lobbyInfo("Conectando…");
+  await loadIce();
   const p = basePeer();
-  p.on("open", id => {
+  let done = false, sigT = 0, hubT = 0, poll = 0, hubTry = 0;
+  const stop = () => { done = true; clearTimeout(sigT); clearInterval(poll); };
+  const fail = msg => { if(done) return; stop(); try{ S.hubConn && S.hubConn.close(); }catch(e){} S.hubConn = null; S.joined = false; try{ p.destroy(); }catch(e){} if(S.peer === p) S.peer = null; lobbyErr(msg); };
+  sigT = setTimeout(() => {
+    if(done || p.open) return;
+    if(attempt < 1){ stop(); try{ p.destroy(); }catch(e){} lobbyInfo("Demorou, tentando de novo…"); joinRoom(name, code, attempt+1); }
+    else fail(MSG_SIGNAL + NET_TIPS);
+  }, 9000);
+  p.once("open", id => {
+    if(done){ try{ p.destroy(); }catch(e){} return; }
+    clearTimeout(sigT);
     S.peer=p; S.code=code; S.myId=id; S.myName=name;
-    openHubConn(true);
+    lobbyInfo("Procurando a sala…");
+    const attemptHub = () => {
+      if(done) return;
+      hubTry++;
+      const c = openHubConn(true), t0 = Date.now();
+      c.on("error", () => { if(!done && $("#room").hidden && S.hubConn === c) giveUpOrRetry(c); });
+      clearInterval(poll);
+      // o hub existe (senão o servidor teria dito "sala não encontrada"), mas a conexão direta não abre: rede bloqueando
+      poll = setInterval(() => {
+        if(done) return;
+        if(!$("#room").hidden){ stop(); return; }
+        const ice = c.peerConnection && c.peerConnection.iceConnectionState;
+        if(ice === "failed" || Date.now() - t0 > 12000) giveUpOrRetry(c);
+        else if(Date.now() - t0 > 5000) lobbyInfo("Estabelecendo conexão com a sala… (rede lenta ou restrita)");
+      }, 800);
+    };
+    const giveUpOrRetry = c => {
+      clearInterval(poll);
+      try{ c.close(); }catch(e){}
+      S.joined = false;
+      if(hubTry < 2){ lobbyInfo("A conexão direta não abriu, tentando de novo…"); setTimeout(attemptHub, 600); }
+      else fail("Achei a sala, mas não consegui abrir a conexão direta com o anfitrião. Sua rede ou a dele está bloqueando." + NET_TIPS);
+    };
+    attemptHub();
   });
   p.on("error", err => {
+    if(done && !S.joined && $("#room").hidden) return;
     if(err.type === "peer-unavailable" && !S.joined && !S.migrating && String(err.message||"").includes("-hub")){
-      p.destroy(); lobbyErr("Sala não encontrada. Confira o código ou peça um convite novo."); return;
+      fail("Sala não encontrada. Confira o código ou peça um convite novo."); return;
+    }
+    if(!done && $("#room").hidden && ["network","server-error","socket-error","socket-closed"].includes(err.type)){
+      if(attempt < 1){ stop(); try{ p.destroy(); }catch(e){} lobbyInfo("Falhou, tentando de novo…"); joinRoom(name, code, attempt+1); }
+      else fail(MSG_SIGNAL + NET_TIPS);
+      return;
     }
     handlePeerError(err);
   });
@@ -915,7 +1055,7 @@ function handlePeerError(err){
     return;
   }
   if(err.type === "network" || err.type === "server-error" || err.type === "socket-error"){
-    if($("#room").hidden) lobbyErr("Sem conexão com o servidor de salas. Tente de novo em alguns segundos.");
+    if($("#room").hidden) lobbyErr(MSG_SIGNAL + NET_TIPS);
     else setNet(false);
     return;
   }
@@ -1101,7 +1241,7 @@ function clientHandle(msg){
       break;
     case "watch": onWatchRequest(msg.from, msg.sid); break;
     case "unwatch": { const k = keyOf(msg.from, msg.sid); closeOut(k); S.wants.delete(k); if(S.acl.pending.delete(k)) render(); break; }
-    case "pending": { const k = keyOf(msg.from, msg.sid); if(S.watching.has(k)) setStatus(k, `Aguardando ${S.members[msg.from]?.name || "a pessoa"} aceitar…`, true); break; }
+    case "pending": { const k = keyOf(msg.from, msg.sid); if(S.watching.has(k)) S.watching.get(k).asking = Date.now(); if(S.watching.has(k)) setStatus(k, `Aguardando ${S.members[msg.from]?.name || "a pessoa"} aceitar…`, true); break; }
     case "deny": onDenied(msg.from, msg.sid, msg.reason); break;
     case "want": {
       const k = keyOf(msg.from, msg.sid);
@@ -1594,6 +1734,7 @@ function watch(key){
   // com mais de uma tela aberta, só a primeira toca som (as outras começam mudas)
   if(S.watching.size > 0 || S.selfTiles.size > 0){ tile.querySelector("video").muted = true; syncMuteBtn(tile); }
   S.watching.set(key, {call:null, stream:null, tile, stall:0});
+  armConnTimer(key);
   setStatus(key, findStream(m, sid).access === "ask" ? `Pedindo permissão a ${m.name}…` : "Conectando à transmissão…", true);
   send({t:"watch", to:owner, sid});
   publishWatching();
@@ -1602,9 +1743,24 @@ function watch(key){
   keepAwake();
   if(S.watching.size === 2 && !store("codeview-multi-tip")){ store("codeview-multi-tip", "1"); toast("Só uma tela toca som por vez. Toque no alto-falante da tela que quiser ouvir.", null, 7000); }
 }
+// se a transmissão não chega em alguns segundos, tenta de novo e, por fim, explica o que pode estar errado
+function armConnTimer(key, stage=0){
+  const w = S.watching.get(key); if(!w) return;
+  clearTimeout(w.connT);
+  w.connT = setTimeout(() => {
+    const w2 = S.watching.get(key);
+    if(!w2 || w2.stream) return;
+    if(w2.asking && Date.now() - w2.asking < 120000){ armConnTimer(key, stage); return; }
+    const who = S.members[parseKey(key).owner]?.name || "a pessoa";
+    if(stage === 0){ rewatch(key); setStatus(key, "Está demorando… tentando de novo", true); armConnTimer(key, 1); }
+    else if(stage === 1){ rewatch(key); setStatus(key, `Ainda sem conexão com ${who}. A rede de um dos dois pode estar bloqueando a conexão direta.`, true); armConnTimer(key, 2); }
+    else setStatus(key, `Não consegui conectar com ${who}. Tente o botão de atualizar da tela, outra rede (4G/5G) ou desligar VPN/extensões de privacidade.`, false);
+  }, stage === 0 ? 12000 : 15000);
+}
 function unwatch(key){
   const w = S.watching.get(key);
   if(!w) return;
+  clearTimeout(w.connT);
   try{ w.call?.close(); }catch(e){}
   S.watching.delete(key);
   removeTile(key, w.tile);
@@ -1637,7 +1793,7 @@ function onIncomingCall(call){
   w.call = call;
   call.answer();
   call.on("stream", stream => {
-    w.stream = stream; w.stall = 0;
+    w.stream = stream; w.stall = 0; clearTimeout(w.connT); w.asking = 0;
     const v = w.tile.querySelector("video");
     if(v.srcObject !== stream){
       v.srcObject = stream;
