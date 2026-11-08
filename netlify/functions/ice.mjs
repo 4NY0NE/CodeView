@@ -20,7 +20,7 @@ async function cloudflare(id, token) {
   const r = await fetch(`https://rtc.live.cloudflare.com/v1/turn/keys/${id}/credentials/generate-ice-servers`, {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify({ ttl: 43200 }),
+    body: JSON.stringify({ ttl: 21600 }), // 6 h: curto o bastante para limitar abuso, longo o bastante para uma sessão
   });
   if (!r.ok) throw new Error("cloudflare " + r.status);
   const j = await r.json();
@@ -37,7 +37,23 @@ async function metered(domain, key) {
   return Array.isArray(j) ? j : [];
 }
 
-export default async () => {
+// Só atende pedidos feitos pelo próprio site (o navegador marca isso sozinho em Sec-Fetch-Site).
+// Não é à prova de quem forja cabeçalhos com um script, mas barra uso casual vindo de outros sites e da barra de endereço.
+function fromOwnSite(req) {
+  const site = req.headers.get("sec-fetch-site");
+  if (site) return site === "same-origin";
+  const host = new URL(req.url).host;
+  for (const h of ["origin", "referer"]) {
+    const v = req.headers.get(h);
+    if (v) { try { return new URL(v).host === host; } catch { return false; } }
+  }
+  return false;
+}
+
+export default async (req) => {
+  if (req.method !== "GET" || !fromOwnSite(req)) {
+    return new Response("Forbidden", { status: 403, headers: { "cache-control": "no-store" } });
+  }
   const env = (k) => (globalThis.Netlify && Netlify.env ? Netlify.env.get(k) : process.env[k]);
   try {
     let list = [];
@@ -51,4 +67,9 @@ export default async () => {
   }
 };
 
-export const config = { path: "/api/ice" };
+// Limite por IP: um uso normal pede 1 vez por abertura da página; isso segura quem tentar raspar credenciais em massa.
+export const config = {
+  path: "/api/ice",
+  method: "GET",
+  rateLimit: { windowLimit: 20, windowSize: 60, aggregateBy: ["ip", "domain"] },
+};

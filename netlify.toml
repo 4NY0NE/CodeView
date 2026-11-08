@@ -24,6 +24,7 @@
   for = "/*"
   [headers.values]
     X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "display-capture=(self), camera=(self), microphone=(self), fullscreen=(self), picture-in-picture=(self), geolocation=()"
 
