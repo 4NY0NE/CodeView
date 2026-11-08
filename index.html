@@ -93,6 +93,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 .err{color:var(--live);font-size:13px;min-height:1em;margin:0}
 .fineprint{font-size:12px;color:var(--dim);margin:0}
 .linkbtn{background:none;border:0;padding:0;color:var(--accent);font:inherit;font-size:13px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;align-self:flex-start}
+.linkbtn[hidden]{display:none}
 .linkbtn:disabled{opacity:.5;cursor:default}
 .diag{display:grid;gap:4px;font-size:13px;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .diag[hidden]{display:none}
@@ -390,6 +391,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
         <button class="btn" type="submit" id="joinBtn">Entrar</button>
       </div>
       <p class="err" id="lobbyErr" role="alert"></p>
+      <button type="button" class="linkbtn" id="installBtn" hidden>Instalar o CodeView como app</button>
       <button type="button" class="linkbtn" id="diagBtn">Testar minha conexão</button>
       <div class="diag" id="diagOut" hidden aria-live="polite"></div>
       <p class="fineprint">Quem cria a sala é o anfitrião: se ele sair, a sala fecha. Para transmitir use Chrome, Edge ou Firefox no computador. Pelo celular dá para assistir.</p>
@@ -564,7 +566,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 (() => {
 "use strict";
 const PREFIX = "codeview-";
-const BUILD = "2026-11-03.1"; // precisa ser igual ao "build" do version.json a cada versão nova
+const BUILD = "2026-11-07.1"; // precisa ser igual ao "build" do version.json a cada versão nova
 const $ = s => document.querySelector(s);
 const QUALITY = {
   "480":  {w:854,  h:480,  br:1200,  label:"480p"},
@@ -700,6 +702,25 @@ $("#lobbyForm").onsubmit = e => {
   lobbyErr(); $("#joinBtn").disabled=true; joinRoom(n, c);
 };
 if(typeof Peer === "undefined"){ lobbyErr("Não consegui carregar o motor de conexão. Verifique a internet e recarregue."); }
+
+/* ---------------- app instalável (PWA) ---------------- */
+(() => {
+  const btn = $("#installBtn");
+  const standalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if(HOSTED && "serviceWorker" in navigator){
+    window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+  }
+  if(!HOSTED || standalone()) return;
+  let ev = null;
+  window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); ev = e; btn.hidden = false; });
+  window.addEventListener("appinstalled", () => { ev = null; btn.hidden = true; toast("CodeView instalado!"); });
+  if(ios){ btn.hidden = false; }
+  btn.onclick = async () => {
+    if(ev){ ev.prompt(); try{ await ev.userChoice; }catch(e){} ev = null; btn.hidden = true; return; }
+    toast("No iPhone/iPad: toque em Compartilhar e depois em “Adicionar à Tela de Início”.", null, 9000);
+  };
+})();
 
 /* ---------------- teste de conexão ---------------- */
 async function runDiag(){
