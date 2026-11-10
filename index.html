@@ -119,6 +119,17 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 .approw .pk-ic,.approw .pk-av{width:32px;height:32px;border-radius:8px;font-size:14px}
 .approw .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .approw input{width:18px;height:18px;accent-color:var(--accent);flex:none}
+.chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin-top:8px}
+.chips:empty{display:none}
+.chips .approw,.pk-more .approw{padding:6px 10px;gap:10px}
+.chips .approw .pk-ic,.chips .approw .pk-av,.pk-more .approw .pk-ic,.pk-more .approw .pk-av{width:26px;height:26px;border-radius:7px;font-size:12px}
+.approw.idle{opacity:.7}
+.pk-more{margin-top:10px}
+.pk-more summary{cursor:pointer;color:var(--muted);font-size:13px;padding:4px 0;user-select:none}
+.pk-more summary:hover{color:var(--text)}
+.pk-more .applist{max-height:170px;overflow:auto;padding-right:4px}
+.pk-none{color:var(--muted);font-size:13px;margin:8px 0 0;background:var(--raise);border:1px dashed var(--line);border-radius:10px;padding:10px 12px}
+.pk-none[hidden],.pk-more[hidden]{display:none}
 .pk-empty{color:var(--muted);font-size:13px;grid-column:1/-1;padding:24px 0;text-align:center}
 .linkbtn[hidden]{display:none}
 .linkbtn:disabled{opacity:.5;cursor:default}
@@ -593,7 +604,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 (() => {
 "use strict";
 const PREFIX = "codeview-";
-const BUILD = "2026-11-10.5"; // precisa ser igual ao "build" do version.json a cada versão nova
+const BUILD = "2026-11-10.6"; // precisa ser igual ao "build" do version.json a cada versão nova
 const $ = s => document.querySelector(s);
 const QUALITY = {
   "480":  {w:854,  h:480,  br:1200,  label:"480p"},
@@ -822,10 +833,10 @@ async function checkVersion(){
     S.seenBuild = j.build;
     if(j.build === S.dismissedBuild) return;
     const live = S.out && S.out.size;
-    showNotice("version", "Saiu uma versão nova do CodeView. Recomendo recarregar a página para atualizar." + (live ? " Sua transmissão será interrompida, então faça isso quando puder." : ""), "Recarregar", () => location.reload());
+    showNotice("version", NATIVE ? "✨ Atualização disponível do CodeView." + (live ? " Sua transmissão será interrompida ao atualizar, então faça isso quando puder." : "") : "Saiu uma versão nova do CodeView. Recomendo recarregar a página para atualizar." + (live ? " Sua transmissão será interrompida, então faça isso quando puder." : ""), NATIVE ? "Atualizar agora" : "Recarregar", () => location.reload());
   }catch(e){}
 }
-setTimeout(checkVersion, 15000);
+setTimeout(checkVersion, NATIVE ? 4000 : 15000);
 setInterval(checkVersion, 120000);
 document.addEventListener("visibilitychange", () => { if(!document.hidden) checkVersion(); });
 
@@ -1413,16 +1424,14 @@ function nativePicker(sound){
     let sources = [], apps = [];
     try{ [sources, apps] = await Promise.all([NATIVE.listSources(), sound === "app" ? NATIVE.listAudioApps() : []]); }
     catch(e){ toast("Não consegui listar as telas: " + (e && e.message || e)); resolve(null); return; }
-    // O Windows entrega alguns títulos com acento quebrado (�): pega o nome certo da janela (mesmo número ou mesmo padrão).
-    const wins = sources.filter(x => x.kind === "window" && x.name);
-    for(const a of apps){
-      if(!String(a.title).includes("\uFFFD")) continue;
-      const ks = hwndKeys(a.hwnd);
+    const scrim = mk("div", "scrim"), box = mk("div", "modal pickmodal");
+    const fixTitle = a => { // o Windows entrega alguns títulos com acento quebrado (�): pega o nome certo da mesma janela
+      if(!String(a.title).includes("\uFFFD")) return a;
+      const wins = sources.filter(x => x.kind === "window" && x.name), ks = hwndKeys(a.hwnd);
       let w = wins.find(x => x.hwnd && ks.has(String(Number(x.hwnd))));
       if(!w){ const re = new RegExp("^" + a.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\uFFFD+/g, ".{1,3}") + "$"); w = wins.find(x => re.test(x.name)); }
-      if(w) a.title = w.name; else a.title = a.title.replace(/\uFFFD+/g, "");
-    }
-    const scrim = mk("div", "scrim"), box = mk("div", "modal pickmodal");
+      a.title = w ? w.name : a.title.replace(/\uFFFD+/g, ""); return a;
+    };
     scrim.id = "nativePick"; box.setAttribute("role", "dialog"); box.setAttribute("aria-label", "Escolher o que transmitir");
     scrim.append(box);
     box.append(mk("h2", null, "O que você quer transmitir?"), mk("p", "sub", "Escolha uma janela ou uma tela inteira. As miniaturas são ao vivo."));
@@ -1432,7 +1441,7 @@ function nativePicker(sound){
     const search = mk("input", "input pk-search"); search.type = "search"; search.placeholder = "Buscar janela…"; search.setAttribute("aria-label", "Buscar janela");
     const grid = mk("div", "srcgrid");
     box.append(tabs, search, grid);
-    let tab = "window", chosen = null, query = "";
+    let tab = "window", chosen = null, query = "", syncApps = () => {};
     const ok = mk("button", "btn primary", "Transmitir"); ok.type = "submit"; ok.disabled = true;
     const cards = new Map();           // id -> {b, im, nm, s}
     const rows = new Map();            // pid -> {row, cb, slot, a}
@@ -1465,7 +1474,7 @@ function nativePicker(sound){
       const c = cards.get(id); if(!c) return;
       chosen = c.s; ok.disabled = false;
       cards.forEach((x, k) => x.b.classList.toggle("sel", k === id));
-      for(const a of apps){ const r = rows.get(a.pid); if(r && sameWin(chosen, a) && !r.cb.checked){ r.cb.checked = true; r.row.classList.add("on"); } } // sugere o som da janela escolhida
+      for(const [, r] of rows) if(sameWin(chosen, r.a) && !r.cb.checked){ r.cb.checked = true; r.row.classList.add("on"); } // sugere o som da janela escolhida
     }
     function render(){
       const wins = sources.filter(s => s.kind !== "screen"), scr = sources.filter(s => s.kind === "screen");
@@ -1486,23 +1495,45 @@ function nativePicker(sound){
         for(const s of list) grid.append(cards.get(s.id).b);
         if(!list.length) grid.append(mk("div", "pk-empty", tab === "screen" ? "Nenhuma tela encontrada." : q ? "Nenhuma janela com esse nome." : "Nenhuma janela aberta encontrada."));
       }
-      for(const a of apps){ const r = rows.get(a.pid); if(r) paintIcon(r.slot, a.title, iconFor(a)); }
+      for(const [, r] of rows) paintIcon(r.slot, r.a.title, iconFor(r.a));
     }
     tabApps.onclick = () => { tab = "window"; render(); };
     tabScr.onclick = () => { tab = "screen"; render(); };
     search.oninput = () => { query = search.value; render(); };
     if(!sources.some(s => s.kind !== "screen") && sources.some(s => s.kind === "screen")) tab = "screen";
     if(sound === "app"){
-      box.append(mk("h3", null, "Som: quais aplicativos?"), mk("p", "help", "Marque os programas cujo som vai para a transmissão. Pode ser diferente da janela mostrada. Programas sem janela visível não aparecem."));
-      const list = mk("div", "applist");
-      for(const a of [...apps].sort((x, y) => x.title.localeCompare(y.title, "pt-BR"))){
-        const row = mk("label", "approw"), slot = mk("span"), t = mk("span", "t", a.title), cb = document.createElement("input"); cb.type = "checkbox";
-        slot.style.display = "contents";
-        cb.onchange = () => row.classList.toggle("on", cb.checked);
-        row.append(slot, t, cb); list.append(row); rows.set(a.pid, {row, cb, slot, a});
-      }
-      if(!apps.length) list.append(mk("p", "help", "Nenhum aplicativo com janela encontrado."));
-      box.append(list);
+      box.append(mk("h3", null, "Som: o que está tocando"), mk("p", "help", "Só aparecem os aplicativos que estão emitindo som agora, já marcados. Desmarque o que não quer enviar."));
+      const act = mk("div", "chips"), none = mk("p", "pk-none"), more = document.createElement("details"), sum = mk("summary"), oth = mk("div", "applist");
+      more.className = "pk-more"; more.append(sum, oth); box.append(act, none, more);
+      syncApps = list => {
+        const seen = new Set(), known = list.some(a => a.active === true || a.active === false);
+        for(const a0 of list){
+          const a = fixTitle(a0); seen.add(a.pid);
+          let r = rows.get(a.pid);
+          if(!r){
+            const row = mk("label", "approw"), slot = mk("span"), t = mk("span", "t"), cb = document.createElement("input"); cb.type = "checkbox";
+            slot.style.display = "contents"; r = {row, cb, slot, t, a, touched:false};
+            cb.onchange = () => { r.touched = true; row.classList.toggle("on", cb.checked); };
+            row.append(slot, t, cb); rows.set(a.pid, r);
+          }
+          r.a = a; r.t.textContent = a.title; r.row.title = a.title;
+          const live = a.active === true;
+          if(live && !r.touched && !r.cb.checked){ r.cb.checked = true; r.row.classList.add("on"); } // tocando agora: já vem marcado
+          r.row.classList.toggle("idle", known && !live);
+          const host = live ? act : oth;
+          if(r.row.parentNode !== host) host.append(r.row);
+        }
+        for(const [pid, r] of [...rows]) if(!seen.has(pid) && !r.cb.checked){ r.row.remove(); rows.delete(pid); }
+        const nOth = oth.children.length;
+        none.hidden = !known || act.children.length > 0;
+        none.textContent = "Nenhum aplicativo está tocando som agora. Dê play no que você quer transmitir e ele aparece aqui.";
+        more.hidden = nOth === 0;
+        sum.textContent = known ? "Outros aplicativos abertos (" + nOth + ")" : "Aplicativos abertos (" + nOth + ") — não consegui ver quem está tocando, marque os que quiser";
+        if(!known) more.open = true;
+        [...oth.children].sort((x, y) => x.textContent.localeCompare(y.textContent, "pt-BR")).forEach(el => oth.append(el));
+        for(const [, r] of rows) paintIcon(r.slot, r.a.title, iconFor(r.a));
+      };
+      syncApps(apps);
     } else if(sound === "system") box.append(mk("p", "help", "Todo o som do computador vai junto com a imagem."));
     else box.append(mk("p", "help", "A transmissão vai sem som."));
     const bar = mk("div", "actions"), cancel = mk("button", "btn ghost", "Cancelar"); cancel.type = "button";
@@ -1512,6 +1543,7 @@ function nativePicker(sound){
     let busy = false;
     const timer = setInterval(async () => {
       if(busy || document.hidden) return; busy = true;
+      try{ if(sound === "app"){ const fa = await NATIVE.listAudioApps(); if(Array.isArray(fa)) syncApps(fa); } }catch(e){}
       try{ const fresh = await NATIVE.listSources(); if(fresh && fresh.length){ sources = fresh; if(chosen){ const again = fresh.find(s => s.id === chosen.id); if(again) chosen = again; } render(); } }catch(e){}
       busy = false;
     }, 2500);

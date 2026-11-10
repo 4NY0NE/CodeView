@@ -3,6 +3,7 @@
 // lista de telas/janelas, som do computador e som POR APLICATIVO (captura de áudio por processo do Windows).
 const { app, BrowserWindow, ipcMain, session, desktopCapturer, shell, Menu } = require("electron");
 const path = require("path");
+const audioWatch = require("./audiowatch");
 
 const SITE = process.env.CODEVIEW_URL || "https://scodeview.netlify.app";
 const SITE_ORIGIN = new URL(SITE).origin;
@@ -49,7 +50,7 @@ function createWindow() {
   win.webContents.on("will-navigate", (e, url) => {
     if (!sameOrigin(url)) { e.preventDefault(); if (/^https?:/i.test(url)) shell.openExternal(url); }
   });
-  win.on("closed", () => { win = null; stopAllCaptures(); });
+  win.on("closed", () => { win = null; stopAllCaptures(); audioWatch.stop(); });
 }
 
 function stopAllCaptures() {
@@ -105,7 +106,19 @@ function registerIpc() {
       const pid = String(r.processId);
       if (!/^\d+$/.test(pid) || Number(pid) === process.pid || seen.has(pid) || !String(r.title || "").trim()) continue;
       seen.add(pid);
-      out.push({ pid, hwnd: String(r.hwnd), title: String(r.title).slice(0, 120) });
+      out.push({ pid, hwnd: String(r.hwnd), title: String(r.title).slice(0, 120), active: null });
+    }
+    // quem está emitindo som agora: a sessão de áudio é do processo que toca (muitas vezes um filho do que tem a janela),
+    // então sobe pela cadeia de pais até achar um processo com janela
+    const snap = await audioWatch.snapshot();
+    if (snap) {
+      const byPid = new Map(out.map(o => [o.pid, o]));
+      for (const o of out) o.active = false;
+      for (const s of snap.sessions) {
+        if (!(s.state === 1 || s.peak > 0)) continue;
+        const hit = [s.pid, ...s.chain].find(p => byPid.has(p));
+        if (hit) byPid.get(hit).active = true;
+      }
     }
     return out;
   });
@@ -140,3 +153,4 @@ function registerIpc() {
 app.whenReady().then(() => { setupPermissions(); registerIpc(); createWindow(); });
 app.on("window-all-closed", () => { stopAllCaptures(); app.quit(); });
 app.on("before-quit", stopAllCaptures);
+app.on("before-quit", () => audioWatch.stop());
