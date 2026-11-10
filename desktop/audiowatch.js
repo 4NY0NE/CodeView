@@ -85,11 +85,12 @@ $src = @"
 ${CS}
 "@
 $ErrorActionPreference = 'Stop'
+try { (Get-Process -Id $PID).PriorityClass = 'BelowNormal' } catch {}
 try { Add-Type -TypeDefinition $src } catch { [Console]::Out.WriteLine('AW|ERR'); [Console]::Out.Flush(); exit 1 }
 $map = @{}; $n = 0
 while ($true) {
   try {
-    if ($n % 3 -eq 0) { $map = @{}; Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId | ForEach-Object { $map[[int]$_.ProcessId] = [int]$_.ParentProcessId } }
+    if ($n % 10 -eq 0) { $map = @{}; Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId | ForEach-Object { $map[[int]$_.ProcessId] = [int]$_.ParentProcessId } }
     $n++
     $out = @()
     foreach ($e in ([AW]::Run() -split ';')) {
@@ -102,7 +103,7 @@ while ($true) {
     [Console]::Out.WriteLine('AW|' + ($out -join ';'))
   } catch { [Console]::Out.WriteLine('AW|ERR') }
   [Console]::Out.Flush()
-  Start-Sleep -Milliseconds 1200
+  Start-Sleep -Milliseconds 1500
 }
 `;
 

@@ -604,7 +604,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 (() => {
 "use strict";
 const PREFIX = "codeview-";
-const BUILD = "2026-11-10.6"; // precisa ser igual ao "build" do version.json a cada versão nova
+const BUILD = "2026-11-10.7"; // precisa ser igual ao "build" do version.json a cada versão nova
 const $ = s => document.querySelector(s);
 const QUALITY = {
   "480":  {w:854,  h:480,  br:1200,  label:"480p"},
@@ -1417,6 +1417,7 @@ const mk = (tag, cls, text) => { const e = document.createElement(tag); if(cls) 
 // Tela de escolha, no estilo do Go Live: abas Aplicativos/Telas com miniaturas ao vivo, e (se o som for "Aplicativos") a lista de programas com ícone.
 // Tudo entra por textContent: título de janela é texto de terceiros.
 const hwndKeys = v => { const s = String(v || "").trim(), k = new Set(); if(!s) return k; if(/^\d+$/.test(s)) k.add(String(Number(s))); const n = parseInt(s, /^0x/i.test(s) || /[a-f]/i.test(s) ? 16 : 10); if(!isNaN(n)) k.add(String(n)); if(/^[0-9a-f]+$/i.test(s)) { const x = parseInt(s, 16); if(!isNaN(x)) k.add(String(x)); } return k; };
+const VOICE_RE = /discord|teamspeak|mumble|guilded|ventrilo|\bzoom\b|skype|microsoft teams|\bmeet\b|webex|slack/i; // conversa por voz: vem desligado
 const AV_COLORS = ["#6c63ff", "#e5484d", "#30a46c", "#f5a524", "#0091ff", "#d6409f", "#12a594"];
 function pkAvatar(name){ const a = mk("div", "pk-av", (String(name).trim()[0] || "?")); let n = 0; for(const c of String(name)) n = (n * 31 + c.charCodeAt(0)) >>> 0; a.style.background = AV_COLORS[n % AV_COLORS.length]; return a; }
 function nativePicker(sound){
@@ -1453,6 +1454,8 @@ function nativePicker(sound){
     const sameWin = (s, a) => s.kind === "window" && ((s.hwnd && hwndKeys(a.hwnd).has(String(Number(s.hwnd)))) || s.name === a.title);
     const label = s => s.kind === "screen" ? "Tela " + (sources.filter(x => x.kind === "screen").indexOf(s) + 1) : (s.name || "Janela");
     function paintIcon(slot, name, icon){
+      const key = (icon ? "i" + icon.length + icon.slice(-24) : "a") + "|" + name;
+      if(slot.dataset.k === key) return; slot.dataset.k = key; // não refaz o desenho se nada mudou (evita travadinha)
       slot.textContent = "";
       if(icon){ const im = mk("img", "pk-ic"); im.src = icon; im.alt = ""; slot.append(im); } else slot.append(pkAvatar(name));
     }
@@ -1502,7 +1505,7 @@ function nativePicker(sound){
     search.oninput = () => { query = search.value; render(); };
     if(!sources.some(s => s.kind !== "screen") && sources.some(s => s.kind === "screen")) tab = "screen";
     if(sound === "app"){
-      box.append(mk("h3", null, "Som: o que está tocando"), mk("p", "help", "Só aparecem os aplicativos que estão emitindo som agora, já marcados. Desmarque o que não quer enviar."));
+      box.append(mk("h3", null, "Som: o que está tocando"), mk("p", "help", "Só aparecem os aplicativos que estão emitindo som agora, já marcados. Apps de conversa por voz (Discord etc.) vêm desmarcados para ninguém ouvir a call. Marque ou desmarque como quiser."));
       const act = mk("div", "chips"), none = mk("p", "pk-none"), more = document.createElement("details"), sum = mk("summary"), oth = mk("div", "applist");
       more.className = "pk-more"; more.append(sum, oth); box.append(act, none, more);
       syncApps = list => {
@@ -1518,7 +1521,7 @@ function nativePicker(sound){
           }
           r.a = a; r.t.textContent = a.title; r.row.title = a.title;
           const live = a.active === true;
-          if(live && !r.touched && !r.cb.checked){ r.cb.checked = true; r.row.classList.add("on"); } // tocando agora: já vem marcado
+          if(live && !r.touched && !r.cb.checked && !VOICE_RE.test(a.title)){ r.cb.checked = true; r.row.classList.add("on"); } // tocando agora: já vem marcado
           r.row.classList.toggle("idle", known && !live);
           const host = live ? act : oth;
           if(r.row.parentNode !== host) host.append(r.row);
@@ -1530,7 +1533,8 @@ function nativePicker(sound){
         more.hidden = nOth === 0;
         sum.textContent = known ? "Outros aplicativos abertos (" + nOth + ")" : "Aplicativos abertos (" + nOth + ") — não consegui ver quem está tocando, marque os que quiser";
         if(!known) more.open = true;
-        [...oth.children].sort((x, y) => x.textContent.localeCompare(y.textContent, "pt-BR")).forEach(el => oth.append(el));
+        const ord = [...oth.children].sort((x, y) => x.textContent.localeCompare(y.textContent, "pt-BR"));
+        if(ord.some((el, i) => el !== oth.children[i])) ord.forEach(el => oth.append(el)); // só reordena se mudou
         for(const [, r] of rows) paintIcon(r.slot, r.a.title, iconFor(r.a));
       };
       syncApps(apps);
@@ -1539,14 +1543,14 @@ function nativePicker(sound){
     const bar = mk("div", "actions"), cancel = mk("button", "btn ghost", "Cancelar"); cancel.type = "button";
     bar.append(cancel, ok); box.append(bar);
     render();
-    // miniaturas ao vivo: atualiza a cada 2,5 s enquanto a janela está aberta
+    // miniaturas ao vivo: atualiza a cada 5 s enquanto a janela está aberta
     let busy = false;
     const timer = setInterval(async () => {
       if(busy || document.hidden) return; busy = true;
-      try{ if(sound === "app"){ const fa = await NATIVE.listAudioApps(); if(Array.isArray(fa)) syncApps(fa); } }catch(e){}
       try{ const fresh = await NATIVE.listSources(); if(fresh && fresh.length){ sources = fresh; if(chosen){ const again = fresh.find(s => s.id === chosen.id); if(again) chosen = again; } render(); } }catch(e){}
+      if(sound === "app"){ try{ const fa = await NATIVE.listAudioApps(); if(Array.isArray(fa)) syncApps(fa); }catch(e){} }
       busy = false;
-    }, 2500);
+    }, 5000);
     const done = v => { clearInterval(timer); document.removeEventListener("keydown", onKey, true); scrim.remove(); resolve(v); };
     const onKey = e => { if(e.key === "Escape"){ e.stopPropagation(); done(null); } };
     document.addEventListener("keydown", onKey, true);

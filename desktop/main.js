@@ -83,6 +83,15 @@ function setupPermissions() {
 function registerIpc() {
   const fromSite = (e) => e.senderFrame && sameOrigin(e.senderFrame.url);
 
+  // ícone de cada janela: converte uma vez só (toDataURL a cada leitura pesa e causa travadinha)
+  const iconCache = new Map();
+  const iconOf = (s) => {
+    if (iconCache.has(s.id)) return iconCache.get(s.id);
+    const v = s.appIcon && !s.appIcon.isEmpty() ? s.appIcon.toDataURL() : "";
+    if (iconCache.size > 300) iconCache.clear();
+    iconCache.set(s.id, v); return v;
+  };
+
   ipcMain.handle("cv:sources", async (e) => {
     if (!fromSite(e)) return [];
     const list = await desktopCapturer.getSources({ types: ["screen", "window"], thumbnailSize: { width: 256, height: 144 }, fetchWindowIcons: true });
@@ -94,12 +103,18 @@ function registerIpc() {
         id: s.id, name: s.name, kind: s.id.startsWith("screen:") ? "screen" : "window",
         hwnd: s.id.startsWith("window:") ? s.id.split(":")[1] : "",
         thumb: s.thumbnail && !s.thumbnail.isEmpty() ? s.thumbnail.toDataURL() : "",
-        icon: s.appIcon && !s.appIcon.isEmpty() ? s.appIcon.toDataURL() : "",
+        icon: iconOf(s),
       }));
   });
 
+  let appsCache = { at: 0, p: null };
   ipcMain.handle("cv:audio-apps", async (e) => {
     if (!fromSite(e) || !loopback) return [];
+    if (appsCache.p && Date.now() - appsCache.at < 3000) return appsCache.p;
+    appsCache = { at: Date.now(), p: listApps() };
+    return appsCache.p;
+  });
+  async function listApps() {
     const rows = await loopback.getActiveWindowProcessIds();
     const seen = new Set(), out = [];
     for (const r of rows) {
@@ -121,7 +136,7 @@ function registerIpc() {
       }
     }
     return out;
-  });
+  }
 
   ipcMain.handle("cv:select", (e, sel) => {
     if (!fromSite(e) || !sel || typeof sel.sourceId !== "string") return false;
