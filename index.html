@@ -93,19 +93,32 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 .err{color:var(--live);font-size:13px;min-height:1em;margin:0}
 .fineprint{font-size:12px;color:var(--dim);margin:0}
 .linkbtn{background:none;border:0;padding:0;color:var(--accent);font:inherit;font-size:13px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;align-self:flex-start}
-.pickmodal{max-width:760px;width:calc(100vw - 32px);max-height:calc(100vh - 32px);overflow:auto}
-.pickmodal h3{margin:14px 0 4px;font-size:14px}
-.srcgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-top:8px}
-.srcitem{display:flex;flex-direction:column;gap:6px;text-align:left;background:var(--raise);border:2px solid var(--line);border-radius:10px;padding:6px;cursor:pointer;color:var(--text);min-width:0}
-.srcitem:hover{border-color:var(--muted)}
-.srcitem.sel{border-color:var(--accent)}
-.srcitem .th{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:6px;background:var(--ink);display:block}
-.srcitem .nm{display:flex;align-items:center;gap:6px;font-size:12px;min-width:0}
-.srcitem .nm img{width:16px;height:16px;flex:none}
+.pickmodal{max-width:820px;width:calc(100vw - 32px);max-height:calc(100vh - 32px);overflow:auto}
+.pickmodal h3{margin:18px 0 2px;font-size:14px}
+.pk-tabs{display:flex;gap:6px;margin:12px 0 10px;border-bottom:1px solid var(--line)}
+.pk-tab{background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);padding:8px 12px;font-weight:600;font-size:14px;cursor:pointer;margin-bottom:-1px}
+.pk-tab:hover{color:var(--text)}
+.pk-tab.on{color:var(--text);border-bottom-color:var(--accent)}
+.pk-tab small{color:var(--dim);font-weight:500;margin-left:4px}
+.pk-search{margin-bottom:10px;padding:8px 12px;font-size:14px}
+.srcgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;min-height:120px}
+.srcitem{position:relative;display:flex;flex-direction:column;gap:8px;text-align:left;background:var(--raise);border:2px solid transparent;border-radius:10px;padding:8px;cursor:pointer;color:var(--text);min-width:0;transition:border-color .12s,background .12s}
+.srcitem:hover{background:#232838;border-color:var(--line)}
+.srcitem.sel{border-color:var(--accent);background:#1b2c30}
+.srcitem.sel::after{content:"✓";position:absolute;top:12px;right:12px;width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-weight:800;font-size:13px;display:grid;place-items:center}
+.srcitem .th{width:100%;aspect-ratio:16/9;object-fit:contain;border-radius:6px;background:#0a0c11;display:block}
+.srcitem .nm{display:flex;align-items:center;gap:8px;font-size:13px;min-width:0}
 .srcitem .nm span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pk-ic{width:20px;height:20px;border-radius:5px;flex:none;object-fit:contain}
+.pk-av{width:20px;height:20px;border-radius:5px;flex:none;display:grid;place-items:center;font:700 11px var(--f-body);color:#fff;text-transform:uppercase}
 .applist{display:grid;gap:6px;margin-top:8px}
-.applist label{display:flex;align-items:center;gap:8px;background:var(--raise);border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer;font-size:14px;min-width:0}
-.applist label span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.approw{display:flex;align-items:center;gap:12px;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer;font-size:14px;min-width:0}
+.approw:hover{border-color:var(--muted)}
+.approw.on{border-color:var(--accent);background:#1b2c30}
+.approw .pk-ic,.approw .pk-av{width:32px;height:32px;border-radius:8px;font-size:14px}
+.approw .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.approw input{width:18px;height:18px;accent-color:var(--accent);flex:none}
+.pk-empty{color:var(--muted);font-size:13px;grid-column:1/-1;padding:24px 0;text-align:center}
 .linkbtn[hidden]{display:none}
 .linkbtn:disabled{opacity:.5;cursor:default}
 .diag{display:grid;gap:4px;font-size:13px;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
@@ -579,7 +592,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 (() => {
 "use strict";
 const PREFIX = "codeview-";
-const BUILD = "2026-11-10.3"; // precisa ser igual ao "build" do version.json a cada versão nova
+const BUILD = "2026-11-10.4"; // precisa ser igual ao "build" do version.json a cada versão nova
 const $ = s => document.querySelector(s);
 const QUALITY = {
   "480":  {w:854,  h:480,  br:1200,  label:"480p"},
@@ -1389,7 +1402,11 @@ $("#goLiveForm").onsubmit = e => {
 /* ---------------- app de Windows: escolher tela e aplicativos de som ---------------- */
 const mk = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; };
 
-// Mostra as telas e janelas e (se o som for "Aplicativos") a lista de programas. Tudo entra por textContent: título de janela é texto de terceiros.
+// Tela de escolha, no estilo do Go Live: abas Aplicativos/Telas com miniaturas ao vivo, e (se o som for "Aplicativos") a lista de programas com ícone.
+// Tudo entra por textContent: título de janela é texto de terceiros.
+const hwndKeys = v => { const s = String(v || "").trim(), k = new Set(); if(!s) return k; if(/^\d+$/.test(s)) k.add(String(Number(s))); const n = parseInt(s, /^0x/i.test(s) || /[a-f]/i.test(s) ? 16 : 10); if(!isNaN(n)) k.add(String(n)); if(/^[0-9a-f]+$/i.test(s)) { const x = parseInt(s, 16); if(!isNaN(x)) k.add(String(x)); } return k; };
+const AV_COLORS = ["#6c63ff", "#e5484d", "#30a46c", "#f5a524", "#0091ff", "#d6409f", "#12a594"];
+function pkAvatar(name){ const a = mk("div", "pk-av", (String(name).trim()[0] || "?")); let n = 0; for(const c of String(name)) n = (n * 31 + c.charCodeAt(0)) >>> 0; a.style.background = AV_COLORS[n % AV_COLORS.length]; return a; }
 function nativePicker(sound){
   return new Promise(async resolve => {
     let sources = [], apps = [];
@@ -1398,32 +1415,81 @@ function nativePicker(sound){
     const scrim = mk("div", "scrim"), box = mk("div", "modal pickmodal");
     scrim.id = "nativePick"; box.setAttribute("role", "dialog"); box.setAttribute("aria-label", "Escolher o que transmitir");
     scrim.append(box);
-    box.append(mk("h2", null, "O que você quer transmitir?"), mk("p", "sub", "Clique na tela ou janela que as pessoas vão ver."));
-    const grid = mk("div", "srcgrid"); box.append(grid);
-    let chosen = null;
-    const checks = new Map();
+    box.append(mk("h2", null, "O que você quer transmitir?"), mk("p", "sub", "Escolha uma janela ou uma tela inteira. As miniaturas são ao vivo."));
+    const tabs = mk("div", "pk-tabs"), tabApps = mk("button", "pk-tab"), tabScr = mk("button", "pk-tab");
+    tabApps.type = tabScr.type = "button";
+    tabs.append(tabApps, tabScr);
+    const search = mk("input", "input pk-search"); search.type = "search"; search.placeholder = "Buscar janela…"; search.setAttribute("aria-label", "Buscar janela");
+    const grid = mk("div", "srcgrid");
+    box.append(tabs, search, grid);
+    let tab = "window", chosen = null, query = "";
     const ok = mk("button", "btn primary", "Transmitir"); ok.type = "submit"; ok.disabled = true;
-    const items = [];
-    for(const s of [...sources.filter(x => x.kind === "screen"), ...sources.filter(x => x.kind !== "screen")]){
-      const b = mk("button", "srcitem"); b.type = "button";
-      if(s.thumb){ const im = mk("img", "th"); im.src = s.thumb; im.alt = ""; b.append(im); } else b.append(mk("div", "th"));
-      const nm = mk("div", "nm");
-      if(s.icon){ const ic = mk("img"); ic.src = s.icon; ic.alt = ""; nm.append(ic); }
-      nm.append(mk("span", null, s.kind === "screen" ? (s.name || "Tela") : (s.name || "Janela")));
-      b.append(nm);
-      b.onclick = () => {
-        chosen = s; items.forEach(i => i.classList.toggle("sel", i === b)); ok.disabled = false;
-        if(s.hwnd) for(const a of apps) if(a.hwnd === s.hwnd && checks.has(a.pid)) checks.get(a.pid).checked = true; // sugere o som da janela escolhida
-      };
-      items.push(b); grid.append(b);
+    const cards = new Map();           // id -> {b, im, nm, s}
+    const rows = new Map();            // pid -> {row, cb, slot, a}
+    const iconFor = a => { // acha o ícone do aplicativo pela janela dele (mesmo número da janela, ou mesmo título)
+      const ks = hwndKeys(a.hwnd);
+      const w = sources.find(s => s.kind === "window" && s.icon && ((s.hwnd && ks.has(String(Number(s.hwnd)))) || s.name === a.title));
+      return w ? w.icon : "";
+    };
+    const sameWin = (s, a) => s.kind === "window" && ((s.hwnd && hwndKeys(a.hwnd).has(String(Number(s.hwnd)))) || s.name === a.title);
+    const label = s => s.kind === "screen" ? "Tela " + (sources.filter(x => x.kind === "screen").indexOf(s) + 1) : (s.name || "Janela");
+    function paintIcon(slot, name, icon){
+      slot.textContent = "";
+      if(icon){ const im = mk("img", "pk-ic"); im.src = icon; im.alt = ""; slot.append(im); } else slot.append(pkAvatar(name));
     }
-    if(!sources.length) grid.append(mk("p", "help", "Nenhuma tela ou janela encontrada."));
+    function fillCard(c, s){
+      c.s = s;
+      if(s.thumb && c.im.dataset.t !== s.thumb){ c.im.src = s.thumb; c.im.dataset.t = s.thumb; }
+      c.nm.textContent = label(s); c.b.title = s.name || "";
+      paintIcon(c.ic, s.name || "?", s.icon);
+    }
+    function makeCard(s){
+      const b = mk("button", "srcitem"); b.type = "button";
+      const im = mk("img", "th"); im.alt = ""; const nmWrap = mk("div", "nm"), ic = mk("span"), nm = mk("span");
+      ic.style.display = "contents"; nmWrap.append(ic, nm); b.append(im, nmWrap);
+      const c = {b, im, nm, ic, s};
+      b.onclick = () => select(c.s.id);
+      fillCard(c, s); return c;
+    }
+    function select(id){
+      const c = cards.get(id); if(!c) return;
+      chosen = c.s; ok.disabled = false;
+      cards.forEach((x, k) => x.b.classList.toggle("sel", k === id));
+      for(const a of apps){ const r = rows.get(a.pid); if(r && sameWin(chosen, a) && !r.cb.checked){ r.cb.checked = true; r.row.classList.add("on"); } } // sugere o som da janela escolhida
+    }
+    function render(){
+      const wins = sources.filter(s => s.kind !== "screen"), scr = sources.filter(s => s.kind === "screen");
+      tabApps.textContent = "Aplicativos"; tabApps.append(mk("small", null, String(wins.length)));
+      tabScr.textContent = "Telas"; tabScr.append(mk("small", null, String(scr.length)));
+      tabApps.classList.toggle("on", tab === "window"); tabScr.classList.toggle("on", tab === "screen");
+      search.hidden = tab !== "window";
+      const alive = new Set(sources.map(s => s.id));
+      for(const [id, c] of cards) if(!alive.has(id) && !(chosen && chosen.id === id)){ c.b.remove(); cards.delete(id); grid.dataset.order = ""; }
+      for(const s of sources){ const c = cards.get(s.id); if(c) fillCard(c, s); else cards.set(s.id, makeCard(s)); }
+      const q = query.trim().toLowerCase();
+      const list = (tab === "screen" ? scr : wins).filter(s => !q || (s.name || "").toLowerCase().includes(q));
+      // só mexe nos cartões quando a lista muda (refazer o elemento no meio de um clique perderia o clique)
+      const want = tab + "|" + q + "|" + list.map(s => s.id).join(",");
+      if(grid.dataset.order !== want){
+        grid.dataset.order = want;
+        grid.textContent = "";
+        for(const s of list) grid.append(cards.get(s.id).b);
+        if(!list.length) grid.append(mk("div", "pk-empty", tab === "screen" ? "Nenhuma tela encontrada." : q ? "Nenhuma janela com esse nome." : "Nenhuma janela aberta encontrada."));
+      }
+      for(const a of apps){ const r = rows.get(a.pid); if(r) paintIcon(r.slot, a.title, iconFor(a)); }
+    }
+    tabApps.onclick = () => { tab = "window"; render(); };
+    tabScr.onclick = () => { tab = "screen"; render(); };
+    search.oninput = () => { query = search.value; render(); };
+    if(!sources.some(s => s.kind !== "screen") && sources.some(s => s.kind === "screen")) tab = "screen";
     if(sound === "app"){
       box.append(mk("h3", null, "Som: quais aplicativos?"), mk("p", "help", "Marque os programas cujo som vai para a transmissão. Pode ser diferente da janela mostrada. Programas sem janela visível não aparecem."));
       const list = mk("div", "applist");
-      for(const a of apps){
-        const lb = mk("label"), cb = document.createElement("input"); cb.type = "checkbox"; checks.set(a.pid, cb);
-        lb.append(cb, mk("span", null, a.title)); list.append(lb);
+      for(const a of [...apps].sort((x, y) => x.title.localeCompare(y.title, "pt-BR"))){
+        const row = mk("label", "approw"), slot = mk("span"), t = mk("span", "t", a.title), cb = document.createElement("input"); cb.type = "checkbox";
+        slot.style.display = "contents";
+        cb.onchange = () => row.classList.toggle("on", cb.checked);
+        row.append(slot, t, cb); list.append(row); rows.set(a.pid, {row, cb, slot, a});
       }
       if(!apps.length) list.append(mk("p", "help", "Nenhum aplicativo com janela encontrado."));
       box.append(list);
@@ -1431,12 +1497,20 @@ function nativePicker(sound){
     else box.append(mk("p", "help", "A transmissão vai sem som."));
     const bar = mk("div", "actions"), cancel = mk("button", "btn ghost", "Cancelar"); cancel.type = "button";
     bar.append(cancel, ok); box.append(bar);
-    const done = v => { document.removeEventListener("keydown", onKey, true); scrim.remove(); resolve(v); };
+    render();
+    // miniaturas ao vivo: atualiza a cada 2,5 s enquanto a janela está aberta
+    let busy = false;
+    const timer = setInterval(async () => {
+      if(busy || document.hidden) return; busy = true;
+      try{ const fresh = await NATIVE.listSources(); if(fresh && fresh.length){ sources = fresh; if(chosen){ const again = fresh.find(s => s.id === chosen.id); if(again) chosen = again; } render(); } }catch(e){}
+      busy = false;
+    }, 2500);
+    const done = v => { clearInterval(timer); document.removeEventListener("keydown", onKey, true); scrim.remove(); resolve(v); };
     const onKey = e => { if(e.key === "Escape"){ e.stopPropagation(); done(null); } };
     document.addEventListener("keydown", onKey, true);
     cancel.onclick = () => done(null);
     scrim.addEventListener("click", e => { if(e.target === scrim) done(null); });
-    ok.onclick = () => { if(chosen) done({sourceId:chosen.id, system:sound === "system", apps:[...checks].filter(([, c]) => c.checked).map(([pid]) => pid)}); };
+    ok.onclick = () => { if(chosen) done({sourceId:chosen.id, system:sound === "system", apps:[...rows].filter(([, r]) => r.cb.checked).map(([pid]) => pid)}); };
     document.body.append(scrim);
   });
 }
