@@ -1,3 +1,14 @@
+# O app de Windows (pasta desktop/) vive no mesmo repositório: não publica o app como site
+# e não refaz o deploy do site quando só o app mudou.
+[build]
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- . ':!desktop' ':!.github'"
+
+[[redirects]]
+  from = "/desktop/*"
+  to = "/404.html"
+  status = 404
+  force = true
+
 # Links de convite bonitos: /sala/K7M2QX abre o app já com o código preenchido.
 [[redirects]]
   from = "/sala/*"

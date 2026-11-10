@@ -93,6 +93,19 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 .err{color:var(--live);font-size:13px;min-height:1em;margin:0}
 .fineprint{font-size:12px;color:var(--dim);margin:0}
 .linkbtn{background:none;border:0;padding:0;color:var(--accent);font:inherit;font-size:13px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;align-self:flex-start}
+.pickmodal{max-width:760px;width:calc(100vw - 32px);max-height:calc(100vh - 32px);overflow:auto}
+.pickmodal h3{margin:14px 0 4px;font-size:14px}
+.srcgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-top:8px}
+.srcitem{display:flex;flex-direction:column;gap:6px;text-align:left;background:var(--raise);border:2px solid var(--line);border-radius:10px;padding:6px;cursor:pointer;color:var(--text);min-width:0}
+.srcitem:hover{border-color:var(--muted)}
+.srcitem.sel{border-color:var(--accent)}
+.srcitem .th{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:6px;background:var(--ink);display:block}
+.srcitem .nm{display:flex;align-items:center;gap:6px;font-size:12px;min-width:0}
+.srcitem .nm img{width:16px;height:16px;flex:none}
+.srcitem .nm span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.applist{display:grid;gap:6px;margin-top:8px}
+.applist label{display:flex;align-items:center;gap:8px;background:var(--raise);border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer;font-size:14px;min-width:0}
+.applist label span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .linkbtn[hidden]{display:none}
 .linkbtn:disabled{opacity:.5;cursor:default}
 .diag{display:grid;gap:4px;font-size:13px;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
@@ -566,7 +579,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 (() => {
 "use strict";
 const PREFIX = "codeview-";
-const BUILD = "2026-11-10.2"; // precisa ser igual ao "build" do version.json a cada versão nova
+const BUILD = "2026-11-10.3"; // precisa ser igual ao "build" do version.json a cada versão nova
 const $ = s => document.querySelector(s);
 const QUALITY = {
   "480":  {w:854,  h:480,  br:1200,  label:"480p"},
@@ -628,6 +641,7 @@ const savePrefs = () => { try{ localStorage.setItem("codeview-prefs", JSON.strin
 const IS_TOUCH = matchMedia("(pointer:coarse)").matches;
 const MOBILE = () => matchMedia("(max-width:980px)").matches;
 // Em produção usamos /sala/CODIGO (o netlify.toml reescreve para o index.html). Local ou file:// usa #CODIGO.
+const NATIVE = window.codeviewNative || null; // existe só dentro do app CodeView para Windows
 const HOSTED = /^https?:$/.test(location.protocol) && !/^(localhost|127\.\d+\.\d+\.\d+|\[::1\]|.+\.local)$/i.test(location.hostname);
 function codeFromUrl(){
   const m = location.pathname.match(/^\/(?:sala|s)\/([A-Za-z0-9]{6})\/?$/);
@@ -705,6 +719,7 @@ if(typeof Peer === "undefined"){ lobbyErr("Não consegui carregar o motor de con
 
 /* ---------------- app instalável (PWA) ---------------- */
 (() => {
+  if(NATIVE) return; // dentro do app de Windows não há o que instalar
   const btn = $("#installBtn");
   const standalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -1302,6 +1317,7 @@ function windowAudioInfo(){
   return {win, mobile, chromium, ver, ok: win && chromium && ver >= 141};
 }
 function soundHelpText(){
+  if(NATIVE) return "App para Windows: escolha “Aplicativos” e, na tela seguinte, marque os programas cujo som vai para a transmissão (por exemplo só o Spotify, ou o jogo e o Discord). “Todo o som” envia tudo o que toca no computador.";
   const w = windowAudioInfo();
   if(w.mobile) return "";
   if(!w.chromium) return "Este navegador não oferece som da tela ou da janela. Use o Chrome ou o Edge no computador para transmitir com som.";
@@ -1310,6 +1326,9 @@ function soundHelpText(){
   return "Neste sistema o som por janela ainda não é oferecido pelo navegador (hoje só no Windows). Para som de um aplicativo só, compartilhe uma aba do navegador, marcando “Compartilhar áudio”. “Todo o som” só aparece ao compartilhar a tela inteira.";
 }
 $("#soundHelp").textContent = soundHelpText();
+if(NATIVE){
+  $("#sApp").nextElementSibling.innerHTML = "Aplicativos<small>você marca quais</small>";
+}
 const MODE_HELP = {
   stable:"Mede a conexão de cada espectador e baixa a qualidade só o necessário para a imagem não congelar. Volta sozinho quando a rede melhora.",
   max:"Mantém exatamente a qualidade escolhida, mesmo se a rede falhar. Quem tiver internet fraca pode ver travando."
@@ -1345,7 +1364,7 @@ function openModal(mode, kind, sid){
   $("#audioHelp").textContent = "Os amigos vão ouvir você junto com a imagem. Use fone para evitar eco.";
   $("#modalTitle").textContent = live ? (cam ? "Qualidade da câmera" : "Qualidade da transmissão") : (cam ? "Transmitir câmera" : "Transmitir tela");
   $("#modalSub").textContent = live ? "As mudanças valem na hora para todos que estão assistindo."
-    : cam ? "O navegador vai pedir permissão para usar a câmera e o microfone." : "Depois de confirmar, o navegador vai perguntar qual tela, janela ou aba você quer mostrar.";
+    : cam ? "O navegador vai pedir permissão para usar a câmera e o microfone." : NATIVE ? "Depois de confirmar, você escolhe a tela ou janela e, se quiser som, os aplicativos." : "Depois de confirmar, o navegador vai perguntar qual tela, janela ou aba você quer mostrar.";
   $("#confirmLive").innerHTML = live ? "Aplicar" : icon(cam ? "cam" : "screen") + (cam ? "Abrir câmera" : "Escolher tela");
   $("#goLiveModal").hidden = false;
   setTimeout(()=>$("#goLiveForm").querySelector("input:checked:not([hidden])")?.focus(), 30);
@@ -1367,6 +1386,104 @@ $("#goLiveForm").onsubmit = e => {
   else { Object.assign(S.prefs[kind], set); savePrefs(); startSource(kind, set); }
 };
 
+/* ---------------- app de Windows: escolher tela e aplicativos de som ---------------- */
+const mk = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; };
+
+// Mostra as telas e janelas e (se o som for "Aplicativos") a lista de programas. Tudo entra por textContent: título de janela é texto de terceiros.
+function nativePicker(sound){
+  return new Promise(async resolve => {
+    let sources = [], apps = [];
+    try{ [sources, apps] = await Promise.all([NATIVE.listSources(), sound === "app" ? NATIVE.listAudioApps() : []]); }
+    catch(e){ toast("Não consegui listar as telas: " + (e && e.message || e)); resolve(null); return; }
+    const scrim = mk("div", "scrim"), box = mk("div", "modal pickmodal");
+    scrim.id = "nativePick"; box.setAttribute("role", "dialog"); box.setAttribute("aria-label", "Escolher o que transmitir");
+    scrim.append(box);
+    box.append(mk("h2", null, "O que você quer transmitir?"), mk("p", "sub", "Clique na tela ou janela que as pessoas vão ver."));
+    const grid = mk("div", "srcgrid"); box.append(grid);
+    let chosen = null;
+    const checks = new Map();
+    const ok = mk("button", "btn primary", "Transmitir"); ok.type = "submit"; ok.disabled = true;
+    const items = [];
+    for(const s of [...sources.filter(x => x.kind === "screen"), ...sources.filter(x => x.kind !== "screen")]){
+      const b = mk("button", "srcitem"); b.type = "button";
+      if(s.thumb){ const im = mk("img", "th"); im.src = s.thumb; im.alt = ""; b.append(im); } else b.append(mk("div", "th"));
+      const nm = mk("div", "nm");
+      if(s.icon){ const ic = mk("img"); ic.src = s.icon; ic.alt = ""; nm.append(ic); }
+      nm.append(mk("span", null, s.kind === "screen" ? (s.name || "Tela") : (s.name || "Janela")));
+      b.append(nm);
+      b.onclick = () => {
+        chosen = s; items.forEach(i => i.classList.toggle("sel", i === b)); ok.disabled = false;
+        if(s.hwnd) for(const a of apps) if(a.hwnd === s.hwnd && checks.has(a.pid)) checks.get(a.pid).checked = true; // sugere o som da janela escolhida
+      };
+      items.push(b); grid.append(b);
+    }
+    if(!sources.length) grid.append(mk("p", "help", "Nenhuma tela ou janela encontrada."));
+    if(sound === "app"){
+      box.append(mk("h3", null, "Som: quais aplicativos?"), mk("p", "help", "Marque os programas cujo som vai para a transmissão. Pode ser diferente da janela mostrada. Programas sem janela visível não aparecem."));
+      const list = mk("div", "applist");
+      for(const a of apps){
+        const lb = mk("label"), cb = document.createElement("input"); cb.type = "checkbox"; checks.set(a.pid, cb);
+        lb.append(cb, mk("span", null, a.title)); list.append(lb);
+      }
+      if(!apps.length) list.append(mk("p", "help", "Nenhum aplicativo com janela encontrado."));
+      box.append(list);
+    } else if(sound === "system") box.append(mk("p", "help", "Todo o som do computador vai junto com a imagem."));
+    else box.append(mk("p", "help", "A transmissão vai sem som."));
+    const bar = mk("div", "actions"), cancel = mk("button", "btn ghost", "Cancelar"); cancel.type = "button";
+    bar.append(cancel, ok); box.append(bar);
+    const done = v => { document.removeEventListener("keydown", onKey, true); scrim.remove(); resolve(v); };
+    const onKey = e => { if(e.key === "Escape"){ e.stopPropagation(); done(null); } };
+    document.addEventListener("keydown", onKey, true);
+    cancel.onclick = () => done(null);
+    scrim.addEventListener("click", e => { if(e.target === scrim) done(null); });
+    ok.onclick = () => { if(chosen) done({sourceId:chosen.id, system:sound === "system", apps:[...checks].filter(([, c]) => c.checked).map(([pid]) => pid)}); };
+    document.body.append(scrim);
+  });
+}
+
+// Junta o som dos aplicativos marcados numa faixa só. O app entrega PCM de 16 bits, estéreo, 48000 Hz.
+const PCM_WORKLET = `class P extends AudioWorkletProcessor{
+  constructor(){ super(); const N = 48000; this.N = N; this.L = new Float32Array(N); this.R = new Float32Array(N); this.w = 0; this.r = 0; this.n = 0; this.play = false; this.rem = new Uint8Array(0);
+    this.port.onmessage = e => {
+      let d = e.data; if(!(d instanceof Uint8Array)) d = new Uint8Array(d);
+      if(this.rem.length){ const m = new Uint8Array(this.rem.length + d.length); m.set(this.rem); m.set(d, this.rem.length); d = m; }
+      const frames = Math.floor(d.length / 4), dv = new DataView(d.buffer, d.byteOffset, d.byteLength);
+      for(let i = 0; i < frames; i++){
+        if(this.n >= this.N){ this.r = (this.r + 1) % this.N; this.n--; }
+        this.L[this.w] = dv.getInt16(i * 4, true) / 32768; this.R[this.w] = dv.getInt16(i * 4 + 2, true) / 32768;
+        this.w = (this.w + 1) % this.N; this.n++;
+      }
+      this.rem = d.slice(frames * 4);
+    };
+  }
+  process(inputs, outputs){
+    const out = outputs[0], l = out[0], r = out[1] || out[0];
+    if(!this.play && this.n >= 2400) this.play = true;
+    for(let i = 0; i < l.length; i++){
+      if(this.play && this.n > 0){ l[i] = this.L[this.r]; r[i] = this.R[this.r]; this.r = (this.r + 1) % this.N; this.n--; }
+      else { l[i] = 0; r[i] = 0; if(this.n === 0) this.play = false; }
+    }
+    return true;
+  }
+}
+registerProcessor("pcm-player", P);`;
+async function startAppMixer(pids){
+  const ctx = new (window.AudioContext || window.webkitAudioContext)({sampleRate:48000, latencyHint:"interactive"});
+  const url = URL.createObjectURL(new Blob([PCM_WORKLET], {type:"text/javascript"}));
+  try{ await ctx.audioWorklet.addModule(url); } finally { URL.revokeObjectURL(url); }
+  const dest = ctx.createMediaStreamDestination(), nodes = new Map();
+  for(const pid of pids){
+    const n = new AudioWorkletNode(ctx, "pcm-player", {numberOfInputs:0, outputChannelCount:[2]});
+    n.connect(dest); nodes.set(String(pid), n);
+  }
+  const off = NATIVE.onAudio((pid, data) => { const n = nodes.get(String(pid)); if(n) n.port.postMessage(data); });
+  const started = [];
+  for(const pid of nodes.keys()) if(await NATIVE.startAppAudio(pid)) started.push(pid);
+  if(!started.length){ off(); try{ ctx.close(); }catch(e){} throw new Error("o Windows não deixou capturar o som desses aplicativos"); }
+  if(ctx.state === "suspended") await ctx.resume();
+  return {track:dest.stream.getAudioTracks()[0], failed:pids.length - started.length, stop(){ off(); started.forEach(p => NATIVE.stopAppAudio(p)); try{ ctx.close(); }catch(e){} }};
+}
+
 async function capture(kind, set){
   const q = QUALITY[set.res] || QUALITY["720"], fps = set.fps;
   if(kind === "camera"){
@@ -1386,13 +1503,26 @@ async function capture(kind, set){
   }
   // som: nenhum, só da janela/aba escolhida, ou todo o som do computador (o navegador decide o que consegue oferecer)
   const sound = set.sound || (set.audio ? "system" : "none");
+  let pick = null;
+  if(NATIVE){
+    pick = await nativePicker(sound);
+    if(!pick) throw new DOMException("cancelado", "AbortError");
+    await NATIVE.select({sourceId:pick.sourceId, systemAudio:pick.system});
+  }
   const stream = await navigator.mediaDevices.getDisplayMedia({
     video:{ width:{ideal:q.w, max:q.w}, height:{ideal:q.h, max:q.h}, frameRate:{ideal:fps, max:fps} },
-    audio: sound !== "none" ? {echoCancellation:false, noiseSuppression:false, autoGainControl:false} : false,
+    audio: (NATIVE ? pick.system : sound !== "none") ? {echoCancellation:false, noiseSuppression:false, autoGainControl:false} : false,
     systemAudio: sound === "system" ? "include" : "exclude",
     windowAudio: sound === "system" ? "system" : sound === "app" ? "window" : "exclude",
     surfaceSwitching:"include", selfBrowserSurface:"exclude"
   });
+  if(pick && pick.apps.length){
+    try{
+      const mixer = await startAppMixer(pick.apps);
+      stream.addTrack(mixer.track); stream._cvNative = mixer;
+      if(mixer.failed) toast(`O som de ${mixer.failed} aplicativo(s) não pôde ser capturado.`, null, 7000);
+    }catch(e){ toast("Não consegui capturar o som dos aplicativos: " + (e && e.message || e), null, 8000); }
+  }
   let micStream = null;
   if(set.mic && navigator.mediaDevices.getUserMedia){
     try{ micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}}); }
@@ -1423,6 +1553,7 @@ function buildAudio(kind, stream, micStream){
 }
 function stopAudio(rec){
   const A = rec && rec.audio; if(!A) return;
+  try{ rec.stream && rec.stream._cvNative && rec.stream._cvNative.stop(); }catch(e){}
   try{ A.sysTrack && A.sysTrack.stop(); A.micTrack && A.micTrack.stop(); A.extra.forEach(m => m.getTracks().forEach(t => t.stop())); A.ctx && A.ctx.close(); }catch(e){}
 }
 function setAudioOn(rec, which, on){
@@ -1472,7 +1603,9 @@ async function startSource(kind, set, replaceSid=null){
     if(!replaceSid) toast("Você está transmitindo a tela inteira, então a prévia fica escondida. Use \"Prévia\" na lista de pessoas se quiser.", null, 8000);
   } else ensureSelfTile(sid);
   keepAwake();
-  if(kind === "screen" && (set.sound || "system") !== "none" && !rec.audio.sysTrack && !replaceSid)
+  if(NATIVE && kind === "screen" && set.sound === "app" && !rec.audio.sysTrack && !replaceSid)
+    toast("Nenhum aplicativo marcado: a transmissão está sem som.", null, 6000);
+  else if(!NATIVE && kind === "screen" && (set.sound || "system") !== "none" && !rec.audio.sysTrack && !replaceSid)
     toast(surf === "window" && !windowAudioInfo().ok
       ? "Esta janela ficou sem som: o som por janela precisa do Chrome ou Edge 141+ no Windows. Compartilhe uma aba (marcando \"Compartilhar áudio\") ou a tela inteira."
       : surf === "window"
