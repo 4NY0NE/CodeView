@@ -465,6 +465,16 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
   <form class="modal" id="goLiveForm">
     <h2 id="modalTitle">Transmitir tela</h2>
     <p class="sub" id="modalSub">Depois de confirmar, o navegador vai perguntar qual tela, janela ou aba você quer mostrar.</p>
+    <div class="field" id="soundRow"><span class="label">Som da transmissão</span>
+      <div class="seg three">
+        <input type="radio" name="sound" id="sNone" value="none"><label for="sNone">Sem som<small>mudo</small></label>
+        <input type="radio" name="sound" id="sApp" value="app"><label for="sApp">Janela ou aba<small>só dela</small></label>
+        <input type="radio" name="sound" id="sSys" value="system" checked><label for="sSys">Todo o som<small>do computador</small></label>
+      </div>
+      <p class="help">O navegador não deixa escolher aplicativos um a um. Para transmitir o som de só um aplicativo, escolha "Janela ou aba" e compartilhe a aba ou a janela dele. "Todo o som" inclui tudo o que toca no computador, e só aparece ao compartilhar a tela inteira (depende do navegador e do sistema).</p>
+    </div>
+    <label class="check" id="micRow"><input type="checkbox" id="micIn"><span>Incluir meu microfone<small>Mistura sua voz com o som da transmissão. Dá para ligar e desligar o som e o microfone ao vivo.</small></span></label>
+    <label class="check" id="audioRow"><input type="checkbox" id="audioIn" checked><span><span id="audioText">Incluir áudio</span><small id="audioHelp">No Chrome/Edge marque "Compartilhar áudio" na janela de escolha. Áudio de janela única só funciona em abas.</small></span></label>
     <div class="field"><span class="label">Modo</span>
       <div class="seg two">
         <input type="radio" name="mode" id="mst" value="stable" checked><label for="mst">Estável<small>ajusta sozinho, sem travar</small></label>
@@ -511,16 +521,6 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
         <option value="auto">Automático</option><option value="5">até 5 Mbps</option><option value="10">até 10 Mbps</option><option value="20">até 20 Mbps</option><option value="50">50 Mbps ou mais</option>
       </select>
     </div>
-    <div class="field" id="soundRow"><span class="label">Som da transmissão</span>
-      <div class="seg three">
-        <input type="radio" name="sound" id="sNone" value="none"><label for="sNone">Sem som<small>mudo</small></label>
-        <input type="radio" name="sound" id="sApp" value="app"><label for="sApp">Janela ou aba<small>só dela</small></label>
-        <input type="radio" name="sound" id="sSys" value="system" checked><label for="sSys">Todo o som<small>do computador</small></label>
-      </div>
-      <p class="help">O navegador não deixa escolher aplicativos um a um. Para transmitir o som de só um aplicativo, escolha "Janela ou aba" e compartilhe a aba ou a janela dele. "Todo o som" inclui tudo o que toca no computador, e só aparece ao compartilhar a tela inteira (depende do navegador e do sistema).</p>
-    </div>
-    <label class="check" id="micRow"><input type="checkbox" id="micIn"><span>Incluir meu microfone<small>Mistura sua voz com o som da transmissão. Dá para ligar e desligar o som e o microfone ao vivo.</small></span></label>
-    <label class="check" id="audioRow"><input type="checkbox" id="audioIn" checked><span><span id="audioText">Incluir áudio</span><small id="audioHelp">No Chrome/Edge marque "Compartilhar áudio" na janela de escolha. Áudio de janela única só funciona em abas.</small></span></label>
     <div class="actions">
       <button class="btn ghost" type="button" id="cancelModal">Cancelar</button>
       <button class="btn primary" type="submit" id="confirmLive"><svg class="i"><use href="#i-screen"/></svg>Escolher tela</button>
@@ -566,7 +566,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 (() => {
 "use strict";
 const PREFIX = "codeview-";
-const BUILD = "2026-11-07.1"; // precisa ser igual ao "build" do version.json a cada versão nova
+const BUILD = "2026-11-10.1"; // precisa ser igual ao "build" do version.json a cada versão nova
 const $ = s => document.querySelector(s);
 const QUALITY = {
   "480":  {w:854,  h:480,  br:1200,  label:"480p"},
