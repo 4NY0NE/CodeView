@@ -471,7 +471,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
         <input type="radio" name="sound" id="sApp" value="app"><label for="sApp">Janela ou aba<small>só dela</small></label>
         <input type="radio" name="sound" id="sSys" value="system" checked><label for="sSys">Todo o som<small>do computador</small></label>
       </div>
-      <p class="help">O navegador não deixa escolher aplicativos um a um. Para transmitir o som de só um aplicativo, escolha "Janela ou aba" e compartilhe a aba ou a janela dele. "Todo o som" inclui tudo o que toca no computador, e só aparece ao compartilhar a tela inteira (depende do navegador e do sistema).</p>
+      <p class="help" id="soundHelp"></p>
     </div>
     <label class="check" id="micRow"><input type="checkbox" id="micIn"><span>Incluir meu microfone<small>Mistura sua voz com o som da transmissão. Dá para ligar e desligar o som e o microfone ao vivo.</small></span></label>
     <label class="check" id="audioRow"><input type="checkbox" id="audioIn" checked><span><span id="audioText">Incluir áudio</span><small id="audioHelp">No Chrome/Edge marque "Compartilhar áudio" na janela de escolha. Áudio de janela única só funciona em abas.</small></span></label>
@@ -566,7 +566,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 (() => {
 "use strict";
 const PREFIX = "codeview-";
-const BUILD = "2026-11-10.1"; // precisa ser igual ao "build" do version.json a cada versão nova
+const BUILD = "2026-11-10.2"; // precisa ser igual ao "build" do version.json a cada versão nova
 const $ = s => document.querySelector(s);
 const QUALITY = {
   "480":  {w:854,  h:480,  br:1200,  label:"480p"},
@@ -1292,6 +1292,24 @@ function readForm(){
   const f = $("#goLiveForm");
   return { res:f.res.value, fps:Number(f.fps.value), hint:f.hint.value || "motion", access:f.access.value || "open", audio:$("#audioIn").checked, sound:f.sound.value || "system", mic:$("#micIn").checked, mode:f.mode.value, facing:f.facing.value || "user", upload:$("#uploadIn").value };
 }
+// Som por aplicativo: o navegador não lista programas, mas o Chrome/Edge 141+ no Windows consegue enviar só o som da JANELA escolhida
+// (é o mesmo recurso do sistema que o Discord usa, só que feito pelo navegador).
+function windowAudioInfo(){
+  const ua = navigator.userAgent || "";
+  const win = /Windows/i.test(ua), mobile = /Android|iPhone|iPad|iPod/i.test(ua);
+  const m = /(?:Edg|Chrome)\/(\d+)/.exec(ua), chromium = !!m && !/OPR\//.test(ua) || /OPR\//.test(ua) && !!m;
+  const ver = m ? Number(m[1]) : 0;
+  return {win, mobile, chromium, ver, ok: win && chromium && ver >= 141};
+}
+function soundHelpText(){
+  const w = windowAudioInfo();
+  if(w.mobile) return "";
+  if(!w.chromium) return "Este navegador não oferece som da tela ou da janela. Use o Chrome ou o Edge no computador para transmitir com som.";
+  if(w.win && w.ok) return "Som por aplicativo: escolha “Janela ou aba”, depois selecione a janela do aplicativo na tela de escolha do navegador. Só o som dele vai para a transmissão. Para vários aplicativos, transmita cada janela como uma fonte (até 3). “Todo o som” só aparece ao compartilhar a tela inteira.";
+  if(w.win) return `Seu navegador (versão ${w.ver}) é antigo para o som por janela. Atualize o Chrome ou o Edge para a versão 141 ou mais nova. Até lá, o som só vem de abas ou da tela inteira.`;
+  return "Neste sistema o som por janela ainda não é oferecido pelo navegador (hoje só no Windows). Para som de um aplicativo só, compartilhe uma aba do navegador, marcando “Compartilhar áudio”. “Todo o som” só aparece ao compartilhar a tela inteira.";
+}
+$("#soundHelp").textContent = soundHelpText();
 const MODE_HELP = {
   stable:"Mede a conexão de cada espectador e baixa a qualidade só o necessário para a imagem não congelar. Volta sozinho quando a rede melhora.",
   max:"Mantém exatamente a qualidade escolhida, mesmo se a rede falhar. Quem tiver internet fraca pode ver travando."
@@ -1455,7 +1473,11 @@ async function startSource(kind, set, replaceSid=null){
   } else ensureSelfTile(sid);
   keepAwake();
   if(kind === "screen" && (set.sound || "system") !== "none" && !rec.audio.sysTrack && !replaceSid)
-    toast("Essa janela ou tela não ofereceu som. Para incluir o som, compartilhe uma aba (marcando \"Compartilhar áudio\") ou a tela inteira.", null, 8000);
+    toast(surf === "window" && !windowAudioInfo().ok
+      ? "Esta janela ficou sem som: o som por janela precisa do Chrome ou Edge 141+ no Windows. Compartilhe uma aba (marcando \"Compartilhar áudio\") ou a tela inteira."
+      : surf === "window"
+      ? "Esta janela não entregou som. Confira se o aplicativo está tocando e se a opção de som está marcada na tela de escolha; senão compartilhe a tela inteira."
+      : "Essa tela ou aba não ofereceu som. Marque \"Compartilhar áudio\" na tela de escolha do navegador.", null, 8000);
   if(replaceSid && !arguments[3]) toast(kind === "camera" ? "Câmera trocada." : "Transmissão trocada.");
   return true;
 }
