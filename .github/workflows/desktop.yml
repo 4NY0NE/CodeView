@@ -1,10 +1,12 @@
 name: Build do CodeView Desktop
 
 # Gera o instalador do Windows e publica em Releases (o site lê o "latest" para mostrar o botão de download).
-# Rode em Actions > "Build do CodeView Desktop" > Run workflow. Subir a versão em desktop/package.json cria uma release nova.
+# Roda sozinho quando algo em desktop/ muda no master (ou em Actions > "Build do CodeView Desktop" > Run workflow). Subir a versão em desktop/package.json cria uma release nova.
 on:
   workflow_dispatch:
   push:
+    branches: [master]
+    paths: ["desktop/**", ".github/workflows/desktop.yml"]
     tags: ["desktop-v*"]
 
 permissions:
