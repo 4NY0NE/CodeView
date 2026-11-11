@@ -1,7 +1,7 @@
 name: Build do CodeView Desktop
 
-# Gera o instalador do Windows. Rode em Actions > "Build do CodeView Desktop" > Run workflow,
-# ou crie uma tag desktop-v0.1.0 para publicar também em Releases.
+# Gera o instalador do Windows e publica em Releases (o site lê o "latest" para mostrar o botão de download).
+# Rode em Actions > "Build do CodeView Desktop" > Run workflow. Subir a versão em desktop/package.json cria uma release nova.
 on:
   workflow_dispatch:
   push:
@@ -31,8 +31,17 @@ jobs:
         with:
           name: CodeView-Setup
           path: desktop/dist/*.exe
+      - name: Versão
+        id: v
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+        shell: bash
       - name: Publicar em Releases
-        if: startsWith(github.ref, 'refs/tags/desktop-v')
         uses: softprops/action-gh-release@v2
         with:
-          files: desktop/dist/*.exe
+          tag_name: desktop-v${{ steps.v.outputs.version }}
+          name: CodeView para Windows ${{ steps.v.outputs.version }}
+          body: |
+            Instalador do CodeView para Windows (escolha de janela e de som por aplicativo).
+            Sem assinatura digital: se o Windows avisar "editor desconhecido", clique em Mais informações e depois em Executar assim mesmo.
+          files: desktop/dist/CodeView-Setup.exe
+          make_latest: true

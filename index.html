@@ -132,6 +132,15 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 .pk-none[hidden],.pk-more[hidden]{display:none}
 .pk-empty{color:var(--muted);font-size:13px;grid-column:1/-1;padding:24px 0;text-align:center}
 .linkbtn[hidden]{display:none}
+.dl{display:flex;gap:12px;align-items:center;margin:14px 0 2px;padding:12px 14px;border-radius:12px;border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line));background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 12%,var(--raise)),var(--raise))}
+.dl[hidden]{display:none}
+.dl>svg{flex:none;width:30px;height:30px;color:var(--accent)}
+.dl b{display:block;font-family:var(--f-display);font-size:15px;line-height:1.2}
+.dl small{display:block;color:var(--muted);font-size:12.5px;line-height:1.4;margin-top:2px}
+.dl a.btn{flex:none;text-decoration:none;padding:8px 14px;font-size:13.5px;white-space:nowrap}
+.dl-note{color:var(--dim);font-size:11.5px;margin:6px 2px 0;line-height:1.4}
+.dl-note[hidden]{display:none}
+@media (max-width:480px){.dl{flex-wrap:wrap}.dl a.btn{width:100%;text-align:center}}
 .linkbtn:disabled{opacity:.5;cursor:default}
 .diag{display:grid;gap:4px;font-size:13px;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .diag[hidden]{display:none}
@@ -429,6 +438,12 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
         <button class="btn" type="submit" id="joinBtn">Entrar</button>
       </div>
       <p class="err" id="lobbyErr" role="alert"></p>
+      <div class="dl" id="dlWin" hidden>
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+        <div><b>CodeView para Windows</b><small id="dlInfo">Escolha a janela e o som de cada app, no estilo do Go Live.</small></div>
+        <a class="btn primary" id="dlBtn" href="#" rel="noopener">Baixar</a>
+      </div>
+      <p class="dl-note" id="dlNote" hidden>Ainda não tem assinatura digital: se o Windows avisar “editor desconhecido”, clique em Mais informações › Executar assim mesmo.</p>
       <button type="button" class="linkbtn" id="installBtn" hidden>Instalar o CodeView como app</button>
       <button type="button" class="linkbtn" id="diagBtn">Testar minha conexão</button>
       <div class="diag" id="diagOut" hidden aria-live="polite"></div>
@@ -604,7 +619,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 (() => {
 "use strict";
 const PREFIX = "codeview-";
-const BUILD = "2026-11-10.7"; // precisa ser igual ao "build" do version.json a cada versão nova
+const BUILD = "2026-11-10.8"; // precisa ser igual ao "build" do version.json a cada versão nova
 const $ = s => document.querySelector(s);
 const QUALITY = {
   "480":  {w:854,  h:480,  br:1200,  label:"480p"},
@@ -760,6 +775,25 @@ if(typeof Peer === "undefined"){ lobbyErr("Não consegui carregar o motor de con
     if(ev){ ev.prompt(); try{ await ev.userChoice; }catch(e){} ev = null; btn.hidden = true; return; }
     toast("No iPhone/iPad: toque em Compartilhar e depois em “Adicionar à Tela de Início”.", null, 9000);
   };
+})();
+
+/* ---------------- app de Windows: link de download (só aparece se já houver instalador publicado) ---------------- */
+(async () => {
+  if(NATIVE || !/Windows NT/i.test(navigator.userAgent) || /Mobile/i.test(navigator.userAgent)) return;
+  const REPO = "4NY0NE/CodeView", PREFIX = "https://github.com/" + REPO + "/releases/download/";
+  try{
+    const r = await fetch("https://api.github.com/repos/" + REPO + "/releases/latest", {headers:{Accept:"application/vnd.github+json"}});
+    if(!r.ok) return;
+    const rel = await r.json(), a = (rel.assets || []).find(x => /\.exe$/i.test(x.name || "") && String(x.browser_download_url).startsWith(PREFIX));
+    if(!a) return;
+    const ver = String(rel.tag_name || "").replace(/^desktop-v/, ""), mb = Math.round((a.size || 0) / 1048576);
+    $("#dlBtn").href = a.browser_download_url;
+    $("#dlInfo").textContent = "Transmita só a janela que quiser e escolha o som de cada app, no estilo do Go Live." + (ver || mb ? " (" + [ver && "v" + ver, mb && mb + " MB"].filter(Boolean).join(" · ") + ")" : "");
+    $("#dlWin").hidden = false; $("#dlNote").hidden = false;
+    // lembrete discreto na tela de transmitir
+    const more = el("a", "linkbtn", "Quer escolher o som de cada app? Baixe o CodeView para Windows."); more.href = a.browser_download_url; more.rel = "noopener";
+    $("#soundHelp").after(more);
+  }catch(e){}
 })();
 
 /* ---------------- teste de conexão ---------------- */
