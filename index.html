@@ -440,7 +440,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
       <p class="err" id="lobbyErr" role="alert"></p>
       <div class="dl" id="dlWin" hidden>
         <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
-        <div><b>CodeView para Windows</b><small id="dlInfo">Escolha a janela e o som de cada app, no estilo do Go Live.</small></div>
+        <div><b>CodeView para Windows</b><small id="dlInfo">Transmita só a janela que quiser e escolha o som de cada app.</small></div>
         <a class="btn primary" id="dlBtn" href="#" rel="noopener">Baixar</a>
       </div>
       <p class="dl-note" id="dlNote" hidden>Ainda não tem assinatura digital: se o Windows avisar “editor desconhecido”, clique em Mais informações › Executar assim mesmo.</p>
@@ -619,7 +619,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 (() => {
 "use strict";
 const PREFIX = "codeview-";
-const BUILD = "2026-11-11.1"; // precisa ser igual ao "build" do version.json a cada versão nova
+const BUILD = "2026-11-11.2"; // precisa ser igual ao "build" do version.json a cada versão nova
 const $ = s => document.querySelector(s);
 const QUALITY = {
   "480":  {w:854,  h:480,  br:1200,  label:"480p"},
@@ -793,7 +793,7 @@ if(typeof Peer === "undefined"){ lobbyErr("Não consegui carregar o motor de con
     if(!a) return;
     const ver = String(rel.tag_name || "").replace(/^desktop-v/, ""), mb = Math.round((a.size || 0) / 1048576);
     url = a.browser_download_url; $("#dlBtn").href = url; more.href = url;
-    $("#dlInfo").textContent = "Transmita só a janela que quiser e escolha o som de cada app, no estilo do Go Live." + (ver || mb ? " (" + [ver && "v" + ver, mb && mb + " MB"].filter(Boolean).join(" · ") + ")" : "");
+    $("#dlInfo").textContent = "Transmita só a janela que quiser e escolha o som de cada app." + (ver || mb ? " (" + [ver && "v" + ver, mb && mb + " MB"].filter(Boolean).join(" · ") + ")" : "");
   }catch(e){}
 })();
 
@@ -1449,7 +1449,7 @@ $("#goLiveForm").onsubmit = e => {
 /* ---------------- app de Windows: escolher tela e aplicativos de som ---------------- */
 const mk = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; };
 
-// Tela de escolha, no estilo do Go Live: abas Aplicativos/Telas com miniaturas ao vivo, e (se o som for "Aplicativos") a lista de programas com ícone.
+// Tela de escolha: abas Aplicativos/Telas com miniaturas ao vivo, e (se o som for "Aplicativos") a lista de programas com ícone.
 // Tudo entra por textContent: título de janela é texto de terceiros.
 const hwndKeys = v => { const s = String(v || "").trim(), k = new Set(); if(!s) return k; if(/^\d+$/.test(s)) k.add(String(Number(s))); const n = parseInt(s, /^0x/i.test(s) || /[a-f]/i.test(s) ? 16 : 10); if(!isNaN(n)) k.add(String(n)); if(/^[0-9a-f]+$/i.test(s)) { const x = parseInt(s, 16); if(!isNaN(x)) k.add(String(x)); } return k; };
 const VOICE_RE = /discord|teamspeak|mumble|guilded|ventrilo|\bzoom\b|skype|microsoft teams|\bmeet\b|webex|slack/i; // conversa por voz: vem desligado
