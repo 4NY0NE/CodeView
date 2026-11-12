@@ -619,7 +619,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 (() => {
 "use strict";
 const PREFIX = "codeview-";
-const BUILD = "2026-11-10.8"; // precisa ser igual ao "build" do version.json a cada versão nova
+const BUILD = "2026-11-11.1"; // precisa ser igual ao "build" do version.json a cada versão nova
 const $ = s => document.querySelector(s);
 const QUALITY = {
   "480":  {w:854,  h:480,  br:1200,  label:"480p"},
@@ -767,6 +767,7 @@ if(typeof Peer === "undefined"){ lobbyErr("Não consegui carregar o motor de con
     window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
   }
   if(!HOSTED || standalone()) return;
+  if(/Windows NT/i.test(navigator.userAgent) && !/Mobile/i.test(navigator.userAgent)) return; // no Windows quem instala é o app (.exe), não o PWA
   let ev = null;
   window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); ev = e; btn.hidden = false; });
   window.addEventListener("appinstalled", () => { ev = null; btn.hidden = true; toast("CodeView instalado!"); });
@@ -781,18 +782,18 @@ if(typeof Peer === "undefined"){ lobbyErr("Não consegui carregar o motor de con
 (async () => {
   if(NATIVE || !/Windows NT/i.test(navigator.userAgent) || /Mobile/i.test(navigator.userAgent)) return;
   const REPO = "4NY0NE/CodeView", PREFIX = "https://github.com/" + REPO + "/releases/download/";
-  try{
+  let url = "https://github.com/" + REPO + "/releases/latest/download/CodeView-Setup.exe"; // link fixo, funciona sem consultar a API
+  $("#dlBtn").href = url; $("#dlWin").hidden = false; $("#dlNote").hidden = false;
+  const more = el("a", "linkbtn", "Quer escolher o som de cada app? Baixe o CodeView para Windows."); more.href = url; more.rel = "noopener";
+  $("#soundHelp").after(more);
+  try{ // enriquece com versão e tamanho, se a consulta funcionar
     const r = await fetch("https://api.github.com/repos/" + REPO + "/releases/latest", {headers:{Accept:"application/vnd.github+json"}});
     if(!r.ok) return;
     const rel = await r.json(), a = (rel.assets || []).find(x => /\.exe$/i.test(x.name || "") && String(x.browser_download_url).startsWith(PREFIX));
     if(!a) return;
     const ver = String(rel.tag_name || "").replace(/^desktop-v/, ""), mb = Math.round((a.size || 0) / 1048576);
-    $("#dlBtn").href = a.browser_download_url;
+    url = a.browser_download_url; $("#dlBtn").href = url; more.href = url;
     $("#dlInfo").textContent = "Transmita só a janela que quiser e escolha o som de cada app, no estilo do Go Live." + (ver || mb ? " (" + [ver && "v" + ver, mb && mb + " MB"].filter(Boolean).join(" · ") + ")" : "");
-    $("#dlWin").hidden = false; $("#dlNote").hidden = false;
-    // lembrete discreto na tela de transmitir
-    const more = el("a", "linkbtn", "Quer escolher o som de cada app? Baixe o CodeView para Windows."); more.href = a.browser_download_url; more.rel = "noopener";
-    $("#soundHelp").after(more);
   }catch(e){}
 })();
 
