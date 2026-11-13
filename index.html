@@ -214,6 +214,15 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 .unmute{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:12px 18px;font-weight:700;display:flex;gap:8px;align-items:center;box-shadow:0 8px 30px rgba(0,0,0,.5)}
 .livebox .meta span.adapt{color:var(--warn)}
 .help{margin:-8px 0 0;font-size:13px;color:var(--muted)}
+.resume{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:12px;background:rgba(79,209,197,.08);border:1px solid rgba(79,209,197,.35);border-radius:10px;padding:10px 12px}
+.resume[hidden],.openapp[hidden]{display:none}
+.resume small{display:block;color:var(--muted);font-size:12px}
+.resume b{font-family:var(--f-mono,monospace);letter-spacing:.14em;font-size:17px}
+.resume .btn{padding:8px 14px;font-size:13.5px;flex:none}
+.openapp{display:flex;flex-direction:column;gap:6px;margin:10px 0 0}
+.openapp a.btn{text-decoration:none;text-align:center}
+.openapp small{color:var(--muted);font-size:12px;line-height:1.4}
+.openapp small a{color:var(--accent)}
 .invite{display:flex;gap:12px;align-items:center;background:rgba(79,209,197,.08);border:1px solid rgba(79,209,197,.35);border-radius:10px;padding:12px 14px}
 .invite small{display:block;color:var(--muted);font-size:13px}
 .invite b{font:500 20px var(--f-mono);letter-spacing:.2em}
@@ -426,7 +435,9 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
       <div class="specs"><span>até 4K</span><span>15 · 30 · 60 fps</span><span>áudio do sistema</span><span>chat + reações</span><span>P2P</span></div>
     </section>
     <form class="card" id="lobbyForm" autocomplete="off">
+      <div class="resume" id="resumeBox" hidden><div><small id="resumeSub">Você estava na sala</small><b id="resumeCode">------</b></div><button type="button" class="btn primary" id="resumeBtn">Voltar</button></div>
       <div class="invite" id="inviteBox" hidden><div><small>Você foi convidado para a sala</small><b id="inviteCode">------</b></div></div>
+      <div class="openapp" id="openApp" hidden><a class="btn" id="openAppBtn" href="#">Abrir no app do CodeView</a><small>Não abriu? <a id="openAppDl" href="#" rel="noopener">Baixe o app</a> ou continue aqui, pelo navegador.</small></div>
       <div class="field">
         <label for="nameIn">Seu nome</label>
         <input class="input" id="nameIn" maxlength="24" placeholder="Como os amigos te chamam" required>
@@ -619,7 +630,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 (() => {
 "use strict";
 const PREFIX = "codeview-";
-const BUILD = "2026-11-11.2"; // precisa ser igual ao "build" do version.json a cada versão nova
+const BUILD = "2026-11-13.1"; // precisa ser igual ao "build" do version.json a cada versão nova
 const $ = s => document.querySelector(s);
 const QUALITY = {
   "480":  {w:854,  h:480,  br:1200,  label:"480p"},
@@ -743,6 +754,54 @@ if(inviteCode){
 }
 
 function lobbyErr(t){ $("#lobbyErr").textContent = t||""; $("#createBtn").disabled=false; $("#joinBtn").disabled=false; }
+
+/* ---------------- voltar para a sala (F5, atualização, reinício) ---------------- */
+// Enquanto você está numa sala, o navegador guarda o código e a hora. Se a página recarregar (F5, atualização do app, queda de energia),
+// você volta sozinho por até 10 minutos; se ninguém mais estiver lá, o primeiro a voltar reabre a sala com o MESMO código.
+const RESUME_MS = 10 * 60 * 1000;
+const SID = (() => { try{ let v = sessionStorage.getItem("codeview-sid"); if(!v){ v = Math.random().toString(36).slice(2); sessionStorage.setItem("codeview-sid", v); } return v; }catch(e){ return ""; } })();
+function readLast(){
+  try{
+    const o = JSON.parse(localStorage.getItem("codeview-last") || "null");
+    if(o && /^[A-Z0-9]{6}$/.test(o.code) && typeof o.name === "string" && o.name && Date.now() - o.t < RESUME_MS) return o;
+  }catch(e){}
+  return null;
+}
+function writeLast(patch){
+  if(!S.code || !S.myName || S.noResume) return;
+  try{ localStorage.setItem("codeview-last", JSON.stringify(Object.assign({code:S.code, name:S.myName, t:Date.now(), left:false, sid:SID}, patch || {}))); }catch(e){}
+}
+function clearLast(){ try{ localStorage.removeItem("codeview-last"); }catch(e){} }
+setInterval(() => { if(!$("#room").hidden && !S.ended && !S.leaving) writeLast(); }, 15000);
+function resumeRoom(name, code){
+  S.resumeCode = code; S.resumeUntil = Date.now() + 90000; // a sala é procurada; se ninguém a segura, eu a reabro
+  $("#nameIn").value = name; $("#codeIn").value = code;
+  lobbyErr(); $("#createBtn").disabled = true; $("#joinBtn").disabled = true; $("#resumeBox").hidden = true;
+  lobbyInfo("Voltando para a sala " + code + "…");
+  joinRoom(name, code);
+}
+const isResuming = code => S.resumeCode === code && Date.now() < S.resumeUntil;
+{
+  const last = readLast();
+  if(last && (!inviteCode || inviteCode === last.code)){
+    const auto = !last.left && (NATIVE || (SID && last.sid === SID)); // F5 na mesma aba (ou app reaberto) volta sozinho; fora disso, um clique
+    if(auto && typeof Peer !== "undefined") setTimeout(() => resumeRoom(last.name, last.code), 50);
+    else{
+      const min = Math.max(1, Math.round((Date.now() - last.t) / 60000));
+      $("#resumeCode").textContent = last.code;
+      $("#resumeSub").textContent = (last.left ? "Você saiu da sala" : "Você estava na sala") + " · há " + min + " min";
+      $("#resumeBox").hidden = false;
+      $("#resumeBtn").onclick = () => resumeRoom(last.name, last.code);
+    }
+  }
+}
+
+/* ---------------- convite: abrir no app (Windows) ---------------- */
+if(inviteCode && !NATIVE && /Windows NT/i.test(navigator.userAgent) && !/Mobile/i.test(navigator.userAgent)){
+  $("#openAppBtn").href = "codeview://sala/" + inviteCode;
+  $("#openAppDl").href = "https://github.com/4NY0NE/CodeView/releases/latest/download/CodeView-Setup.exe";
+  $("#openApp").hidden = false;
+}
 function getName(){
   const n = $("#nameIn").value.trim();
   if(!n){ lobbyErr("Escreva seu nome primeiro."); $("#nameIn").focus(); return null; }
@@ -962,6 +1021,7 @@ async function createRoom(name, code, tries=0, attempt=0){
   hp.on("error", err => {
     if(done && S.isHost){ handlePeerError(err); return; }
     if(done) return;
+    if(err.type === "unavailable-id" && isResuming(code)){ done = true; clearTimeout(sigT); try{ hp.destroy(); }catch(e){} try{ p && p.destroy(); }catch(e){} lobbyInfo("Voltando para a sala " + code + "…"); setTimeout(() => joinRoom(name, code), 700 + Math.random() * 900); return; } // alguém chegou antes: entro na sala dele
     if(err.type === "unavailable-id" && tries < 4){ done = true; clearTimeout(sigT); hp.destroy(); createRoom(name, randCode(), tries+1); return; }
     if(["network","server-error","socket-error","socket-closed"].includes(err.type)){ if(attempt < 1) retry(); else fail(MSG_SIGNAL + NET_TIPS); return; }
     fail("Não deu para criar a sala: " + err.type);
@@ -1012,6 +1072,10 @@ async function joinRoom(name, code, attempt=0){
   p.on("error", err => {
     if(done && !S.joined && $("#room").hidden) return;
     if(err.type === "peer-unavailable" && !S.joined && !S.migrating && String(err.message||"").includes("-hub")){
+      if(isResuming(code)){ // ninguém está segurando a sala: reabro com o mesmo código
+        stop(); try{ S.hubConn && S.hubConn.close(); }catch(e){} S.hubConn = null; try{ p.destroy(); }catch(e){} if(S.peer === p) S.peer = null;
+        createRoom(name, code); return;
+      }
       fail("Sala não encontrada. Confira o código ou peça um convite novo."); return;
     }
     if(!done && $("#room").hidden && ["network","server-error","socket-error","socket-closed"].includes(err.type)){
@@ -1167,6 +1231,8 @@ function enterRoom(){
     store("codeview-mobile-tip", "1");
     setTimeout(() => toast("Pelo celular você pode transmitir a câmera. Para compartilhar a tela, use o computador.", null, 8000), 800);
   }
+  S.leaving = false; S.resumeCode = ""; writeLast();
+  try{ NATIVE && NATIVE.setRoomState && NATIVE.setRoomState(true); }catch(e){}
   renderDock();
   render();
 }
@@ -1331,7 +1397,7 @@ function clientHandle(msg){
       if(S.out.size) publishStreams();
       if(S.watching.size) publishWatching();
       break;
-    case "kicked": endRoom(msg.ban ? "Você foi banido" : "Você foi removido", msg.ban ? "O anfitrião baniu você desta sala." : "O anfitrião removeu você da sala."); break;
+    case "kicked": S.noResume = true; clearLast(); endRoom(msg.ban ? "Você foi banido" : "Você foi removido", msg.ban ? "O anfitrião baniu você desta sala." : "O anfitrião removeu você da sala."); break;
     case "forcestop":
       if(S.out.has(msg.sid)){ stopSource(msg.sid); toast("O anfitrião encerrou uma das suas transmissões.", null, 7000); }
       break;
@@ -2655,7 +2721,8 @@ $("#copyInvite").onclick = async () => {
 function closeDrawers(){ if(MOBILE()) setTab("stage"); }
 
 function teardown(){
-  S.ended = true;
+  S.ended = true; S.leaving = true; writeLast({left:true});
+  try{ NATIVE && NATIVE.setRoomState && NATIVE.setRoomState(false); }catch(e){}
   try{ S.out.forEach(r => { r.stream.getTracks().forEach(t => t.stop()); stopAudio(r); }); }catch(e){}
   try{ S.hubPeer?.destroy(); }catch(e){}
   try{ S.peer?.destroy(); }catch(e){}
@@ -2672,7 +2739,7 @@ $("#leaveBtn").onclick = () => {
   setTimeout(() => { teardown(); goHome(); }, wait);
 };
 $("#backBtn").onclick = () => goHome();
-const bye = () => { try{ if(S.isHost) handoverNow(); else if(S.hubConn?.open) S.hubConn.send({t:"bye"}); }catch(e){} try{ S.peer?.destroy(); S.hubPeer?.destroy(); }catch(e){} };
+const bye = () => { if(!S.leaving && !S.ended) writeLast(); try{ if(S.isHost) handoverNow(); else if(S.hubConn?.open) S.hubConn.send({t:"bye"}); }catch(e){} try{ S.peer?.destroy(); S.hubPeer?.destroy(); }catch(e){} };
 window.addEventListener("pagehide", bye);
 window.addEventListener("beforeunload", bye);
 })();

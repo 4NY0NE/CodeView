@@ -7,6 +7,8 @@ ipcRenderer.on("cv:audio", (_e, pid, data) => { for (const cb of listeners) { tr
 contextBridge.exposeInMainWorld("codeviewNative", {
   version: 1,
   platform: process.platform,
+  // avisa o app se estamos numa sala (para continuar em segundo plano ao fechar a janela)
+  setRoomState: (inRoom) => ipcRenderer.send("cv:room-state", { inRoom: !!inRoom }),
   listSources: () => ipcRenderer.invoke("cv:sources"),
   listAudioApps: () => ipcRenderer.invoke("cv:audio-apps"),
   select: (sel) => ipcRenderer.invoke("cv:select", sel),

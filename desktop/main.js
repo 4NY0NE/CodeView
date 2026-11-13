@@ -1,7 +1,7 @@
 // CodeView para Windows.
 // Abre o site do CodeView numa janela própria e dá a ele o que o navegador não tem:
 // lista de telas/janelas, som do computador e som POR APLICATIVO (captura de áudio por processo do Windows).
-const { app, BrowserWindow, ipcMain, session, desktopCapturer, shell, Menu } = require("electron");
+const { app, BrowserWindow, ipcMain, session, desktopCapturer, shell, Menu, Tray, nativeImage, dialog, powerSaveBlocker } = require("electron");
 const path = require("path");
 const audioWatch = require("./audiowatch");
 
@@ -21,17 +21,53 @@ if (IS_WIN) {
 }
 
 let win = null;
+let tray = null;
+let quitting = false;
+let inRoom = false;              // a tela do CodeView avisa quando está numa sala (mantém o app vivo em segundo plano)
+let keepAwake = null;            // id do powerSaveBlocker enquanto estiver numa sala
+let hintShown = false;
+const START_HIDDEN = process.argv.includes("--hidden");
 let selection = null;            // { sourceId, systemAudio } escolhido na tela do CodeView
 const captures = new Set();      // PIDs com captura de som em andamento
 
+// convite: codeview://sala/ABC123 (só 6 letras/números; qualquer outra coisa é ignorada)
+function inviteFromArgs(args) {
+  for (const a of args || []) {
+    const m = /^codeview:\/\/(?:sala|join)\/([A-Za-z0-9]{6})\/?$/i.exec(String(a));
+    if (m) return m[1].toUpperCase();
+  }
+  return "";
+}
+function showWindow() { if (!win) return; if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
+async function openInvite(code) {
+  if (!code) return;
+  if (!win) { createWindow(code); return; }
+  showWindow();
+  if (inRoom) { // não derruba a sala atual sem perguntar
+    const r = await dialog.showMessageBox(win, { type: "question", buttons: ["Entrar na nova sala", "Ficar onde estou"], defaultId: 1, cancelId: 1,
+      title: "CodeView", message: "Entrar na sala " + code + "?", detail: "Você vai sair da sala em que está agora." });
+    if (r.response !== 0) return;
+  }
+  win.loadURL(SITE + "/sala/" + code);
+}
+
 if (!app.requestSingleInstanceLock()) { app.quit(); }
-else app.on("second-instance", () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
+else app.on("second-instance", (_e, argv) => {
+  const code = inviteFromArgs(argv);
+  if (code) openInvite(code); else showWindow();
+});
+// protocolo codeview:// (o instalador também registra; isto cobre o app rodando sem instalar)
+try {
+  if (process.defaultApp && process.argv.length >= 2) app.setAsDefaultProtocolClient("codeview", process.execPath, [path.resolve(process.argv[1])]);
+  else app.setAsDefaultProtocolClient("codeview");
+} catch {}
 
 function sameOrigin(url) { try { return new URL(url).origin === SITE_ORIGIN; } catch { return false; } }
 
-function createWindow() {
+function createWindow(inviteCode) {
   Menu.setApplicationMenu(null);
   win = new BrowserWindow({
+    show: !(START_HIDDEN && !inviteCode),
     width: 1360, height: 860, minWidth: 900, minHeight: 600,
     backgroundColor: "#0e1016", title: "CodeView", autoHideMenuBar: true,
     icon: path.join(__dirname, "build", "icon.png"),
@@ -39,9 +75,14 @@ function createWindow() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true, nodeIntegration: false, sandbox: true,
       autoplayPolicy: "no-user-gesture-required",
+      backgroundThrottling: false, // minimizado ou na bandeja a transmissão e o som não podem ficar lentos
     },
   });
-  win.loadURL(SITE);
+  win.loadURL(inviteCode ? SITE + "/sala/" + inviteCode : SITE);
+  win.webContents.on("did-start-navigation", (e, _url, inPlace, mainFrame) => {
+    const main = e && e.isMainFrame !== undefined ? e.isMainFrame : mainFrame, same = e && e.isSameDocument !== undefined ? e.isSameDocument : inPlace;
+    if (main && !same) setInRoom(false);
+  });
   // links externos abrem no navegador do sistema; o app só navega dentro do CodeView
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/i.test(url) && !sameOrigin(url)) shell.openExternal(url);
@@ -50,7 +91,48 @@ function createWindow() {
   win.webContents.on("will-navigate", (e, url) => {
     if (!sameOrigin(url)) { e.preventDefault(); if (/^https?:/i.test(url)) shell.openExternal(url); }
   });
+  // fechar a janela dentro de uma sala não tira você dela: o app continua na bandeja
+  win.on("close", (e) => {
+    if (quitting || !inRoom) return;
+    e.preventDefault(); win.hide();
+    if (!hintShown && tray && process.platform === "win32") {
+      hintShown = true;
+      try { tray.displayBalloon({ title: "CodeView continua aberto", content: "Você segue na sala, em segundo plano. Para fechar de vez, clique com o botão direito no ícone e escolha Sair.", iconType: "info" }); } catch {}
+    }
+  });
   win.on("closed", () => { win = null; stopAllCaptures(); audioWatch.stop(); });
+}
+
+function setInRoom(v) {
+  v = !!v;
+  if (v === inRoom) return;
+  inRoom = v;
+  if (v && keepAwake === null) { try { keepAwake = powerSaveBlocker.start("prevent-app-suspension"); } catch {} }
+  if (!v && keepAwake !== null) { try { powerSaveBlocker.stop(keepAwake); } catch {} keepAwake = null; }
+  updateTray();
+}
+
+function createTray() {
+  try {
+    const img = nativeImage.createFromPath(path.join(__dirname, "build", "icon.png"));
+    tray = new Tray(img.isEmpty() ? img : img.resize({ width: 16, height: 16 }));
+    tray.setToolTip("CodeView");
+    tray.on("click", showWindow);
+    updateTray();
+  } catch (e) { console.error("Bandeja indisponível:", e.message); }
+}
+function updateTray() {
+  if (!tray) return;
+  const login = app.getLoginItemSettings().openAtLogin;
+  tray.setToolTip(inRoom ? "CodeView — você está em uma sala" : "CodeView");
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: "Abrir o CodeView", click: showWindow },
+    { type: "separator" },
+    { label: "Abrir junto com o Windows (em segundo plano)", type: "checkbox", checked: login,
+      click: (item) => { try { app.setLoginItemSettings({ openAtLogin: item.checked, args: ["--hidden"] }); } catch {} } },
+    { type: "separator" },
+    { label: "Sair do CodeView", click: () => { quitting = true; app.quit(); } },
+  ]));
 }
 
 function stopAllCaptures() {
@@ -138,6 +220,11 @@ function registerIpc() {
     return out;
   }
 
+  ipcMain.on("cv:room-state", (e, st) => {
+    if (!fromSite(e) || !st || typeof st !== "object") return;
+    setInRoom(st.inRoom === true);
+  });
+
   ipcMain.handle("cv:select", (e, sel) => {
     if (!fromSite(e) || !sel || typeof sel.sourceId !== "string") return false;
     selection = { sourceId: sel.sourceId, systemAudio: !!sel.systemAudio };
@@ -165,7 +252,7 @@ function registerIpc() {
   });
 }
 
-app.whenReady().then(() => { setupPermissions(); registerIpc(); createWindow(); });
+app.whenReady().then(() => { setupPermissions(); registerIpc(); createTray(); createWindow(inviteFromArgs(process.argv)); });
 app.on("window-all-closed", () => { stopAllCaptures(); app.quit(); });
-app.on("before-quit", stopAllCaptures);
+app.on("before-quit", () => { quitting = true; stopAllCaptures(); });
 app.on("before-quit", () => audioWatch.stop());
