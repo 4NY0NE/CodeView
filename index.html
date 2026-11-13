@@ -226,7 +226,29 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 .invite{display:flex;gap:12px;align-items:center;background:rgba(79,209,197,.08);border:1px solid rgba(79,209,197,.35);border-radius:10px;padding:12px 14px}
 .invite small{display:block;color:var(--muted);font-size:13px}
 .invite b{font:500 20px var(--f-mono);letter-spacing:.2em}
-.card.invited #createBtn{background:var(--raise);border-color:var(--line);color:var(--text)}
+.err:empty{display:none}
+.card{gap:16px}
+.lobby-foot{display:flex;flex-direction:column;gap:10px;align-items:flex-start;border-top:1px solid var(--line);padding-top:14px;margin-top:2px}
+.lobby-foot .fineprint{line-height:1.5}
+.dl{margin:0}
+.dl-note{color:var(--muted);font-size:12px;line-height:1.5;margin:0}
+.card.invited .dl-note{display:none}
+/* convite: tela enxuta, um caminho principal */
+.card.invited .invite{order:0;justify-content:space-between;padding:14px 16px}
+.card.invited .invite b{font-size:22px}
+.card.invited .field{order:1}
+.card.invited .row{order:2;flex-direction:column;gap:0}
+.card.invited .row .input{display:none}
+.card.invited #joinBtn{width:100%;padding:13px 16px;font-size:15px}
+.card.invited .openapp{order:3;margin:-4px 0 0;align-items:center;text-align:center}
+.card.invited .openapp a.btn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:transparent;border:1px solid var(--line);color:var(--text)}
+.card.invited .openapp a.btn:hover{border-color:var(--accent)}
+.card.invited #createBtn{order:4;background:none;border:0;color:var(--muted);font-size:13px;padding:2px;font-weight:500;text-decoration:underline;text-underline-offset:3px;box-shadow:none}
+.card.invited #createBtn:hover{color:var(--text)}
+.card.invited #createBtn svg,.card.invited .split,.card.invited .dl{display:none!important}
+.card.invited .err{order:5}
+.card.invited .lobby-foot{order:6}
+.card.invited #resumeBox{order:0}
 .card.invited #joinBtn{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .mreacts{display:none;gap:2px}
 .mreacts button{background:transparent;border:0;font-size:24px;padding:6px 8px;border-radius:10px;line-height:1}
@@ -437,7 +459,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
     <form class="card" id="lobbyForm" autocomplete="off">
       <div class="resume" id="resumeBox" hidden><div><small id="resumeSub">Você estava na sala</small><b id="resumeCode">------</b></div><button type="button" class="btn primary" id="resumeBtn">Voltar</button></div>
       <div class="invite" id="inviteBox" hidden><div><small>Você foi convidado para a sala</small><b id="inviteCode">------</b></div></div>
-      <div class="openapp" id="openApp" hidden><a class="btn" id="openAppBtn" href="#">Abrir no app do CodeView</a><small>Não abriu? <a id="openAppDl" href="#" rel="noopener">Baixe o app</a> ou continue aqui, pelo navegador.</small></div>
+      <div class="openapp" id="openApp" hidden><a class="btn" id="openAppBtn" href="#"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>Abrir no app do CodeView</a><small>Não abriu? <a id="openAppDl" href="#" rel="noopener">Baixe o app</a></small></div>
       <div class="field">
         <label for="nameIn">Seu nome</label>
         <input class="input" id="nameIn" maxlength="24" placeholder="Como os amigos te chamam" required>
@@ -454,11 +476,13 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
         <div><b>CodeView para Windows</b><small id="dlInfo">Transmita só a janela que quiser e escolha o som de cada app.</small></div>
         <a class="btn primary" id="dlBtn" href="#" rel="noopener">Baixar</a>
       </div>
-      <p class="dl-note" id="dlNote" hidden>Ainda não tem assinatura digital: se o Windows avisar “editor desconhecido”, clique em Mais informações › Executar assim mesmo.</p>
-      <button type="button" class="linkbtn" id="installBtn" hidden>Instalar o CodeView como app</button>
-      <button type="button" class="linkbtn" id="diagBtn">Testar minha conexão</button>
-      <div class="diag" id="diagOut" hidden aria-live="polite"></div>
-      <p class="fineprint">Se o anfitrião sair, outra pessoa assume a sala. Para transmitir use Chrome, Edge ou Firefox no computador. Pelo celular dá para assistir.</p>
+      <div class="lobby-foot">
+        <p class="dl-note" id="dlNote" hidden>O app ainda não tem assinatura digital: se o Windows avisar “editor desconhecido”, clique em Mais informações › Executar assim mesmo.</p>
+        <button type="button" class="linkbtn" id="installBtn" hidden>Instalar o CodeView como app</button>
+        <button type="button" class="linkbtn" id="diagBtn">Testar minha conexão</button>
+        <div class="diag" id="diagOut" hidden aria-live="polite"></div>
+        <p class="fineprint">Se o anfitrião sair, outra pessoa assume a sala. Para transmitir, use Chrome, Edge ou Firefox no computador; pelo celular dá para assistir.</p>
+      </div>
     </form>
   </div>
 </main>
@@ -630,7 +654,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 (() => {
 "use strict";
 const PREFIX = "codeview-";
-const BUILD = "2026-11-13.2"; // precisa ser igual ao "build" do version.json a cada versão nova
+const BUILD = "2026-11-13.4"; // precisa ser igual ao "build" do version.json a cada versão nova
 const $ = s => document.querySelector(s);
 const QUALITY = {
   "480":  {w:854,  h:480,  br:1200,  label:"480p"},
@@ -750,6 +774,7 @@ $("#codeIn").addEventListener("input", e => { e.target.value = e.target.value.to
 if(inviteCode){
   $("#codeIn").value = inviteCode; $("#inviteCode").textContent = inviteCode;
   $("#inviteBox").hidden = false; $("#lobbyForm").classList.add("invited");
+  $("#joinBtn").textContent = "Entrar na sala"; $("#createBtn").lastChild.textContent = "ou crie a sua própria sala";
   setTimeout(() => ($("#nameIn").value ? $("#joinBtn") : $("#nameIn")).focus(), 50);
 }
 
