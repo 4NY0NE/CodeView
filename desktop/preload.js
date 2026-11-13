@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld("codeviewNative", {
   platform: process.platform,
   // avisa o app se estamos numa sala (para continuar em segundo plano ao fechar a janela)
   setRoomState: (inRoom) => ipcRenderer.send("cv:room-state", { inRoom: !!inRoom }),
+  appVersion: () => ipcRenderer.invoke("cv:app-version"),
   listSources: () => ipcRenderer.invoke("cv:sources"),
   listAudioApps: () => ipcRenderer.invoke("cv:audio-apps"),
   select: (sel) => ipcRenderer.invoke("cv:select", sel),

@@ -94,10 +94,10 @@ function createWindow(inviteCode) {
   // fechar a janela dentro de uma sala não tira você dela: o app continua na bandeja
   win.on("close", (e) => {
     if (quitting || !inRoom) return;
-    e.preventDefault(); win.hide();
+    e.preventDefault(); win.minimize(); // minimiza (o ícone continua na barra de tarefas) e segue na sala
     if (!hintShown && tray && process.platform === "win32") {
       hintShown = true;
-      try { tray.displayBalloon({ title: "CodeView continua aberto", content: "Você segue na sala, em segundo plano. Para fechar de vez, clique com o botão direito no ícone e escolha Sair.", iconType: "info" }); } catch {}
+      try { tray.displayBalloon({ title: "CodeView continua aberto", content: "Você segue na sala, em segundo plano. Para fechar de vez, use Sair no ícone da bandeja (perto do relógio) ou saia da sala antes de fechar.", iconType: "info" }); } catch {}
     }
   });
   win.on("closed", () => { win = null; stopAllCaptures(); audioWatch.stop(); });
@@ -220,6 +220,7 @@ function registerIpc() {
     return out;
   }
 
+  ipcMain.handle("cv:app-version", (e) => (fromSite(e) ? app.getVersion() : ""));
   ipcMain.on("cv:room-state", (e, st) => {
     if (!fromSite(e) || !st || typeof st !== "object") return;
     setInRoom(st.inRoom === true);

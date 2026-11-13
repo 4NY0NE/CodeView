@@ -458,7 +458,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
       <button type="button" class="linkbtn" id="installBtn" hidden>Instalar o CodeView como app</button>
       <button type="button" class="linkbtn" id="diagBtn">Testar minha conexão</button>
       <div class="diag" id="diagOut" hidden aria-live="polite"></div>
-      <p class="fineprint">Quem cria a sala é o anfitrião: se ele sair, a sala fecha. Para transmitir use Chrome, Edge ou Firefox no computador. Pelo celular dá para assistir.</p>
+      <p class="fineprint">Se o anfitrião sair, outra pessoa assume a sala. Para transmitir use Chrome, Edge ou Firefox no computador. Pelo celular dá para assistir.</p>
     </form>
   </div>
 </main>
@@ -630,7 +630,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 (() => {
 "use strict";
 const PREFIX = "codeview-";
-const BUILD = "2026-11-13.1"; // precisa ser igual ao "build" do version.json a cada versão nova
+const BUILD = "2026-11-13.2"; // precisa ser igual ao "build" do version.json a cada versão nova
 const $ = s => document.querySelector(s);
 const QUALITY = {
   "480":  {w:854,  h:480,  br:1200,  label:"480p"},
@@ -814,6 +814,7 @@ $("#lobbyForm").onsubmit = e => {
   if(!/^[A-Z0-9]{6}$/.test(c)){ lobbyErr("O código tem 6 letras/números."); return; }
   lobbyErr(); $("#joinBtn").disabled=true; joinRoom(n, c);
 };
+if(NATIVE && NATIVE.appVersion){ NATIVE.appVersion().then(v => { if(v){ const f = document.querySelector("#lobbyForm .fineprint"); if(f) f.textContent += " · App CodeView para Windows v" + v; } }).catch(() => {}); }
 if(typeof Peer === "undefined"){ lobbyErr("Não consegui carregar o motor de conexão. Verifique a internet e recarregue."); }
 
 /* ---------------- app instalável (PWA) ---------------- */
