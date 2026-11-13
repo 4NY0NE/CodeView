@@ -1,6 +1,6 @@
 {
   "name": "codeview-desktop",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "description": "CodeView para Windows: transmissão de tela com som por aplicativo",
   "main": "main.js",
@@ -21,7 +21,7 @@
     "appId": "app.codeview.desktop",
     "productName": "CodeView",
     "directories": { "output": "dist", "buildResources": "build" },
-    "files": ["main.js", "preload.js", "audiowatch.js", "package.json"],
+    "files": ["main.js", "preload.js", "audiowatch.js", "package.json", "assets/**"],
     "asarUnpack": ["node_modules/application-loopback/bin/**"],
     "win": {
       "target": [{ "target": "nsis", "arch": ["x64"] }],

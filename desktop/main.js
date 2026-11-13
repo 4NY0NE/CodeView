@@ -70,7 +70,7 @@ function createWindow(inviteCode) {
     show: !(START_HIDDEN && !inviteCode),
     width: 1360, height: 860, minWidth: 900, minHeight: 600,
     backgroundColor: "#0e1016", title: "CodeView", autoHideMenuBar: true,
-    icon: path.join(__dirname, "build", "icon.png"),
+    icon: path.join(__dirname, "assets", "icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true, nodeIntegration: false, sandbox: true,
@@ -79,10 +79,7 @@ function createWindow(inviteCode) {
     },
   });
   win.loadURL(inviteCode ? SITE + "/sala/" + inviteCode : SITE);
-  win.webContents.on("did-start-navigation", (e, _url, inPlace, mainFrame) => {
-    const main = e && e.isMainFrame !== undefined ? e.isMainFrame : mainFrame, same = e && e.isSameDocument !== undefined ? e.isSameDocument : inPlace;
-    if (main && !same) setInRoom(false);
-  });
+  win.webContents.on("did-finish-load", () => setInRoom(false)); // página recarregada: a tela reavisa quando entrar na sala de novo
   // links externos abrem no navegador do sistema; o app só navega dentro do CodeView
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/i.test(url) && !sameOrigin(url)) shell.openExternal(url);
@@ -114,8 +111,9 @@ function setInRoom(v) {
 
 function createTray() {
   try {
-    const img = nativeImage.createFromPath(path.join(__dirname, "build", "icon.png"));
-    tray = new Tray(img.isEmpty() ? img : img.resize({ width: 16, height: 16 }));
+    const img = nativeImage.createFromPath(path.join(__dirname, "assets", "tray.png"));
+    if (img.isEmpty()) console.error("Ícone da bandeja não encontrado");
+    tray = new Tray(img.resize({ width: 16, height: 16 }));
     tray.setToolTip("CodeView");
     tray.on("click", showWindow);
     updateTray();

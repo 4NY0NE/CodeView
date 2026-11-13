@@ -654,7 +654,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 (() => {
 "use strict";
 const PREFIX = "codeview-";
-const BUILD = "2026-11-13.4"; // precisa ser igual ao "build" do version.json a cada versão nova
+const BUILD = "2026-11-13.5"; // precisa ser igual ao "build" do version.json a cada versão nova
 const $ = s => document.querySelector(s);
 const QUALITY = {
   "480":  {w:854,  h:480,  br:1200,  label:"480p"},
@@ -797,7 +797,7 @@ function writeLast(patch){
   try{ localStorage.setItem("codeview-last", JSON.stringify(Object.assign({code:S.code, name:S.myName, t:Date.now(), left:false, sid:SID}, patch || {}))); }catch(e){}
 }
 function clearLast(){ try{ localStorage.removeItem("codeview-last"); }catch(e){} }
-setInterval(() => { if(!$("#room").hidden && !S.ended && !S.leaving) writeLast(); }, 15000);
+setInterval(() => { if(!$("#room").hidden && !S.ended && !S.leaving){ writeLast(); try{ NATIVE && NATIVE.setRoomState && NATIVE.setRoomState(true); }catch(e){} } }, 15000);
 function resumeRoom(name, code){
   S.resumeCode = code; S.resumeUntil = Date.now() + 90000; // a sala é procurada; se ninguém a segura, eu a reabro
   $("#nameIn").value = name; $("#codeIn").value = code;

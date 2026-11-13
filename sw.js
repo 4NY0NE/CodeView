@@ -1,7 +1,7 @@
 // Service worker do CodeView: deixa o app instalável, abre rápido e mostra a tela inicial mesmo sem internet.
 // Vídeo e conexão da sala sempre vão pela rede (WebRTC não passa por aqui).
 // A CADA versão nova, troque o número abaixo junto com o BUILD do index.html e o version.json.
-const VERSION = "2026-11-13.4";
+const VERSION = "2026-11-13.5";
 const CACHE = "codeview-" + VERSION;
 const SHELL = ["/", "/peerjs.min.js", "/qrcode.min.js", "/manifest.webmanifest", "/favicon.svg", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 
