@@ -27,6 +27,16 @@ let inRoom = false;              // a tela do CodeView avisa quando está numa s
 let keepAwake = null;            // id do powerSaveBlocker enquanto estiver numa sala
 let hintShown = false;
 const START_HIDDEN = process.argv.includes("--hidden");
+
+// registro simples para diagnóstico: %APPDATA%\CodeView\codeview.log (guarda só as últimas ~200 KB)
+function log(...a) {
+  try {
+    const f = path.join(app.getPath("userData"), "codeview.log");
+    const fs = require("fs");
+    try { if (fs.statSync(f).size > 200000) fs.renameSync(f, f + ".old"); } catch {}
+    fs.appendFileSync(f, new Date().toISOString() + " " + a.join(" ") + "\n");
+  } catch {}
+}
 let selection = null;            // { sourceId, systemAudio } escolhido na tela do CodeView
 const captures = new Set();      // PIDs com captura de som em andamento
 
@@ -79,7 +89,7 @@ function createWindow(inviteCode) {
     },
   });
   win.loadURL(inviteCode ? SITE + "/sala/" + inviteCode : SITE);
-  win.webContents.on("did-finish-load", () => setInRoom(false)); // página recarregada: a tela reavisa quando entrar na sala de novo
+  win.webContents.on("did-finish-load", () => { log("página carregada", win && win.webContents.getURL()); setInRoom(false); }); // página recarregada: a tela reavisa quando entrar na sala de novo
   // links externos abrem no navegador do sistema; o app só navega dentro do CodeView
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/i.test(url) && !sameOrigin(url)) shell.openExternal(url);
@@ -90,6 +100,7 @@ function createWindow(inviteCode) {
   });
   // fechar a janela dentro de uma sala não tira você dela: o app continua na bandeja
   win.on("close", (e) => {
+    log("fechar janela: inRoom=" + inRoom, "quitting=" + quitting, "->", (quitting || !inRoom) ? "encerra" : "minimiza");
     if (quitting || !inRoom) return;
     e.preventDefault(); win.minimize(); // minimiza (o ícone continua na barra de tarefas) e segue na sala
     if (!hintShown && tray && process.platform === "win32") {
@@ -116,8 +127,9 @@ function createTray() {
     tray = new Tray(img.resize({ width: 16, height: 16 }));
     tray.setToolTip("CodeView");
     tray.on("click", showWindow);
+    log("bandeja criada");
     updateTray();
-  } catch (e) { console.error("Bandeja indisponível:", e.message); }
+  } catch (e) { { console.error("Bandeja indisponível:", e.message); log("bandeja falhou:", e.message); } }
 }
 function updateTray() {
   if (!tray) return;
@@ -220,7 +232,8 @@ function registerIpc() {
 
   ipcMain.handle("cv:app-version", (e) => (fromSite(e) ? app.getVersion() : ""));
   ipcMain.on("cv:room-state", (e, st) => {
-    if (!fromSite(e) || !st || typeof st !== "object") return;
+    if (!fromSite(e) || !st || typeof st !== "object") { log("room-state recusado de", e.senderFrame && e.senderFrame.url); return; }
+    if ((st.inRoom === true) !== inRoom) log("room-state", st.inRoom === true);
     setInRoom(st.inRoom === true);
   });
 
@@ -251,7 +264,9 @@ function registerIpc() {
   });
 }
 
-app.whenReady().then(() => { setupPermissions(); registerIpc(); createTray(); createWindow(inviteFromArgs(process.argv)); });
+app.whenReady().then(() => {
+  log("início v" + app.getVersion(), process.platform, "args:", process.argv.slice(1).join(" "));
+  setupPermissions(); registerIpc(); createTray(); createWindow(inviteFromArgs(process.argv)); });
 app.on("window-all-closed", () => { stopAllCaptures(); app.quit(); });
-app.on("before-quit", () => { quitting = true; stopAllCaptures(); });
+app.on("before-quit", () => { log("encerrando"); quitting = true; stopAllCaptures(); });
 app.on("before-quit", () => audioWatch.stop());
