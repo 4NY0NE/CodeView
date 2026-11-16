@@ -45,5 +45,8 @@ jobs:
           body: |
             Instalador do CodeView para Windows (escolha de janela e de som por aplicativo).
             Sem assinatura digital: se o Windows avisar "editor desconhecido", clique em Mais informações e depois em Executar assim mesmo.
-          files: desktop/dist/CodeView-Setup.exe
+          files: |
+            desktop/dist/CodeView-Setup.exe
+            desktop/dist/CodeView-Setup.exe.blockmap
+            desktop/dist/latest.yml
           make_latest: true

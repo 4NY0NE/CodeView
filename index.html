@@ -654,7 +654,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 (() => {
 "use strict";
 const PREFIX = "codeview-";
-const BUILD = "2026-11-13.5"; // precisa ser igual ao "build" do version.json a cada versão nova
+const BUILD = "2026-11-13.6"; // precisa ser igual ao "build" do version.json a cada versão nova
 const $ = s => document.querySelector(s);
 const QUALITY = {
   "480":  {w:854,  h:480,  br:1200,  label:"480p"},
@@ -955,6 +955,17 @@ async function checkVersion(){
     const live = S.out && S.out.size;
     showNotice("version", NATIVE ? "✨ Atualização disponível do CodeView." + (live ? " Sua transmissão será interrompida ao atualizar, então faça isso quando puder." : "") : "Saiu uma versão nova do CodeView. Recomendo recarregar a página para atualizar." + (live ? " Sua transmissão será interrompida, então faça isso quando puder." : ""), NATIVE ? "Atualizar agora" : "Recarregar", () => location.reload());
   }catch(e){}
+}
+// atualização do próprio app (o instalador novo é baixado sozinho; a pessoa só reinicia quando quiser)
+if(NATIVE && NATIVE.onUpdate){
+  const onUpd = st => {
+    if(!st) return;
+    if(st.state === "ready"){
+      const live = S.out && S.out.size;
+      showNotice("app", "⬇️ O app CodeView " + st.version + " está pronto para instalar." + (live ? " Sua transmissão será interrompida ao reiniciar." : " Ele também instala sozinho quando você fechar o app."), "Reiniciar e atualizar", () => { try{ NATIVE.installUpdate(); }catch(e){} });
+    } else if(S.noticeKey === "app") hideNotice("app");
+  };
+  try{ NATIVE.onUpdate(onUpd); NATIVE.updateState && NATIVE.updateState().then(onUpd).catch(() => {}); }catch(e){}
 }
 setTimeout(checkVersion, NATIVE ? 4000 : 15000);
 setInterval(checkVersion, 120000);

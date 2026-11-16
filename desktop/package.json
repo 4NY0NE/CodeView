@@ -1,6 +1,6 @@
 {
   "name": "codeview-desktop",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "private": true,
   "description": "CodeView para Windows: transmissão de tela com som por aplicativo",
   "main": "main.js",
@@ -11,7 +11,8 @@
     "dist": "electron-builder --win --publish never"
   },
   "dependencies": {
-    "application-loopback": "1.2.7"
+    "application-loopback": "1.2.7",
+    "electron-updater": "6.8.11"
   },
   "devDependencies": {
     "electron": "45.3.0",
@@ -20,15 +21,53 @@
   "build": {
     "appId": "app.codeview.desktop",
     "productName": "CodeView",
-    "directories": { "output": "dist", "buildResources": "build" },
-    "files": ["main.js", "preload.js", "audiowatch.js", "package.json", "assets/**"],
-    "asarUnpack": ["node_modules/application-loopback/bin/**"],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "audiowatch.js",
+      "updater.js",
+      "package.json",
+      "assets/**"
+    ],
+    "asarUnpack": [
+      "node_modules/application-loopback/bin/**"
+    ],
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "build/icon.png",
       "artifactName": "CodeView-Setup.${ext}"
     },
-    "protocols": [{ "name": "CodeView", "schemes": ["codeview"] }],
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "perMachine": false }
+    "protocols": [
+      {
+        "name": "CodeView",
+        "schemes": [
+          "codeview"
+        ]
+      }
+    ],
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "4NY0NE",
+        "repo": "CodeView",
+        "releaseType": "release"
+      }
+    ]
   }
 }

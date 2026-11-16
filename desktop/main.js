@@ -4,6 +4,7 @@
 const { app, BrowserWindow, ipcMain, session, desktopCapturer, shell, Menu, Tray, nativeImage, dialog, powerSaveBlocker } = require("electron");
 const path = require("path");
 const audioWatch = require("./audiowatch");
+const updater = require("./updater");
 
 const SITE = process.env.CODEVIEW_URL || "https://scodeview.netlify.app";
 const SITE_ORIGIN = new URL(SITE).origin;
@@ -137,6 +138,7 @@ function updateTray() {
   tray.setToolTip(inRoom ? "CodeView — você está em uma sala" : "CodeView");
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: "Abrir o CodeView", click: showWindow },
+    ...(updater.getState().state === "ready" ? [{ label: "Reiniciar para atualizar (v" + updater.getState().version + ")", click: () => updater.installNow(() => { quitting = true; }) }] : []),
     { type: "separator" },
     { label: "Abrir junto com o Windows (em segundo plano)", type: "checkbox", checked: login,
       click: (item) => { try { app.setLoginItemSettings({ openAtLogin: item.checked, args: ["--hidden"] }); } catch {} } },
@@ -230,6 +232,8 @@ function registerIpc() {
     return out;
   }
 
+  ipcMain.handle("cv:update-state", (e) => (fromSite(e) ? updater.getState() : null));
+  ipcMain.handle("cv:update-install", (e) => (fromSite(e) ? updater.installNow(() => { quitting = true; }) : false));
   ipcMain.handle("cv:app-version", (e) => (fromSite(e) ? app.getVersion() : ""));
   ipcMain.on("cv:room-state", (e, st) => {
     if (!fromSite(e) || !st || typeof st !== "object") { log("room-state recusado de", e.senderFrame && e.senderFrame.url); return; }
@@ -266,7 +270,9 @@ function registerIpc() {
 
 app.whenReady().then(() => {
   log("início v" + app.getVersion(), process.platform, "args:", process.argv.slice(1).join(" "));
-  setupPermissions(); registerIpc(); createTray(); createWindow(inviteFromArgs(process.argv)); });
+  setupPermissions(); registerIpc(); createTray(); createWindow(inviteFromArgs(process.argv));
+  updater.init({ log, onState: (st) => { try { if (win && !win.isDestroyed()) win.webContents.send("cv:update", st); } catch {} updateTray(); } });
+});
 app.on("window-all-closed", () => { stopAllCaptures(); app.quit(); });
 app.on("before-quit", () => { log("encerrando"); quitting = true; stopAllCaptures(); });
-app.on("before-quit", () => audioWatch.stop());
+app.on("before-quit", () => { audioWatch.stop(); updater.stop(); });
