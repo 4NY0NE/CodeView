@@ -1,6 +1,6 @@
 {
   "name": "codeview-desktop",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "private": true,
   "description": "CodeView para Windows: transmissão de tela com som por aplicativo",
   "main": "main.js",
