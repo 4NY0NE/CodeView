@@ -26,7 +26,14 @@ function init({ log, onState }) {
   setTimeout(check, 15000);
   timer = setInterval(check, 30 * 60 * 1000);
 }
-function check() { if (!autoUpdater || state.state === "downloading" || state.state === "ready") return; autoUpdater.checkForUpdates().catch((e) => logFn("upd verificar:", e && e.message)); }
+let lastCheck = 0;
+// force: pedido manual; sem force, só confere se já passaram 5 minutos da última conferência
+function check(force) {
+  if (!autoUpdater || state.state === "downloading" || state.state === "ready" || state.state === "checking") return;
+  if (force !== true && Date.now() - lastCheck < 5 * 60 * 1000) return;
+  lastCheck = Date.now();
+  autoUpdater.checkForUpdates().catch((e) => logFn("upd verificar:", e && e.message));
+}
 function installNow(beforeQuit) {
   if (!autoUpdater || state.state !== "ready") return false;
   try { if (beforeQuit) beforeQuit(); autoUpdater.quitAndInstall(false, true); return true; } catch (e) { logFn("upd instalar:", e.message); return false; }

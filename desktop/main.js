@@ -135,6 +135,7 @@ function createWindow(inviteCode) {
       if (r.response === 0) goBackground(); else { quitting = true; app.quit(); }
     }).catch(() => { closeAsking = false; });
   });
+  win.on("focus", () => updater.check());
   win.on("closed", () => { win = null; stopAllCaptures(); audioWatch.stop(); });
 }
 
@@ -164,7 +165,12 @@ function updateTray() {
   tray.setToolTip(inRoom ? "CodeView — você está em uma sala" : "CodeView");
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: "Abrir o CodeView", click: showWindow },
-    ...(updater.getState().state === "ready" ? [{ label: "Reiniciar para atualizar (v" + updater.getState().version + ")", click: () => updater.installNow(() => { quitting = true; }) }] : []),
+    (() => {
+      const u = updater.getState();
+      if (u.state === "ready") return { label: "Reiniciar para atualizar (v" + u.version + ")", click: () => updater.installNow(() => { quitting = true; }) };
+      if (u.state === "downloading") return { label: "Baixando atualização… " + (u.percent || 0) + "%", enabled: false };
+      return { label: "Verificar atualizações (v" + app.getVersion() + ")", click: () => updater.check(true) };
+    })(),
     { type: "separator" },
     { label: "Ao fechar a janela (X)", submenu: [
       { label: "Perguntar", type: "radio", checked: closeMode() === "ask" || closeMode() === "auto", click: () => saveSetting("closeAction", "ask") },
