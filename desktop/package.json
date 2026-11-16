@@ -1,6 +1,6 @@
 {
   "name": "codeview-desktop",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "private": true,
   "description": "CodeView para Windows: transmissão de tela com som por aplicativo",
   "main": "main.js",
@@ -59,7 +59,8 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "perMachine": false
+      "perMachine": false,
+      "include": "build/installer.nsh"
     },
     "publish": [
       {
