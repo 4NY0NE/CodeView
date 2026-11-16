@@ -24,6 +24,20 @@ if (IS_WIN) {
 let win = null;
 let tray = null;
 let quitting = false;
+let closeAsking = false;
+// preferência do que o X faz: "ask" (perguntar), "background" (continua na bandeja) ou "quit" (fecha o app)
+const settingsFile = () => path.join(app.getPath("userData"), "settings.json");
+function readSettings() { try { return JSON.parse(require("fs").readFileSync(settingsFile(), "utf8")) || {}; } catch { return {}; } }
+function saveSetting(k, v) { try { const o = readSettings(); o[k] = v; require("fs").writeFileSync(settingsFile(), JSON.stringify(o)); } catch (e) { log("settings erro:", e.message); } }
+function closeMode() { const m = readSettings().closeAction; return m === "background" || m === "quit" || m === "ask" ? m : "auto"; } // auto: pergunta dentro de sala, fecha fora dela
+function goBackground() {
+  if (!win) return;
+  win.hide(); // some da barra de tarefas; o ícone da bandeja (perto do relógio) continua
+  if (!hintShown && tray && process.platform === "win32") {
+    hintShown = true;
+    try { tray.displayBalloon({ title: "CodeView continua aberto", content: "Segue em segundo plano. Clique no ícone aqui perto do relógio para abrir, ou use Sair para fechar de vez.", iconType: "info" }); } catch {}
+  }
+}
 let inRoom = false;              // a tela do CodeView avisa quando está numa sala (mantém o app vivo em segundo plano)
 let keepAwake = null;            // id do powerSaveBlocker enquanto estiver numa sala
 let hintShown = false;
@@ -101,13 +115,25 @@ function createWindow(inviteCode) {
   });
   // fechar a janela dentro de uma sala não tira você dela: o app continua na bandeja
   win.on("close", (e) => {
-    log("fechar janela: inRoom=" + inRoom, "quitting=" + quitting, "->", (quitting || !inRoom) ? "encerra" : "minimiza");
-    if (quitting || !inRoom) return;
-    e.preventDefault(); win.minimize(); // minimiza (o ícone continua na barra de tarefas) e segue na sala
-    if (!hintShown && tray && process.platform === "win32") {
-      hintShown = true;
-      try { tray.displayBalloon({ title: "CodeView continua aberto", content: "Você segue na sala, em segundo plano. Para fechar de vez, use Sair no ícone da bandeja (perto do relógio) ou saia da sala antes de fechar.", iconType: "info" }); } catch {}
-    }
+    const mode = closeMode();
+    const action = quitting ? "quit" : mode === "background" ? "background" : mode === "quit" ? "quit" : mode === "ask" ? "ask" : (inRoom ? "ask" : "quit");
+    log("fechar janela: inRoom=" + inRoom, "modo=" + mode, "->", action);
+    if (action === "quit") return;
+    e.preventDefault();
+    if (action === "background") { goBackground(); return; }
+    if (closeAsking) return;
+    closeAsking = true;
+    dialog.showMessageBox(win, {
+      type: "question", buttons: ["Continuar em segundo plano", "Fechar o app", "Cancelar"], defaultId: 0, cancelId: 2,
+      title: "CodeView", message: inRoom ? "Você está em uma sala. O que fazer?" : "O que fazer ao fechar?",
+      detail: "Em segundo plano o CodeView fica só no ícone perto do relógio e você continua na sala. Dá para mudar isso depois pelo ícone da bandeja.",
+      checkboxLabel: "Lembrar minha escolha", checkboxChecked: false,
+    }).then((r) => {
+      closeAsking = false;
+      if (r.response === 2) return;
+      if (r.checkboxChecked) saveSetting("closeAction", r.response === 0 ? "background" : "quit");
+      if (r.response === 0) goBackground(); else { quitting = true; app.quit(); }
+    }).catch(() => { closeAsking = false; });
   });
   win.on("closed", () => { win = null; stopAllCaptures(); audioWatch.stop(); });
 }
@@ -140,6 +166,11 @@ function updateTray() {
     { label: "Abrir o CodeView", click: showWindow },
     ...(updater.getState().state === "ready" ? [{ label: "Reiniciar para atualizar (v" + updater.getState().version + ")", click: () => updater.installNow(() => { quitting = true; }) }] : []),
     { type: "separator" },
+    { label: "Ao fechar a janela (X)", submenu: [
+      { label: "Perguntar", type: "radio", checked: closeMode() === "ask" || closeMode() === "auto", click: () => saveSetting("closeAction", "ask") },
+      { label: "Continuar em segundo plano", type: "radio", checked: closeMode() === "background", click: () => saveSetting("closeAction", "background") },
+      { label: "Fechar o app", type: "radio", checked: closeMode() === "quit", click: () => saveSetting("closeAction", "quit") },
+    ] },
     { label: "Abrir junto com o Windows (em segundo plano)", type: "checkbox", checked: login,
       click: (item) => { try { app.setLoginItemSettings({ openAtLogin: item.checked, args: ["--hidden"] }); } catch {} } },
     { type: "separator" },
